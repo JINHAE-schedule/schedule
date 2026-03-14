@@ -108,7 +108,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 .month-dow.sat{color:var(--accent);}
 .month-dow.sun{color:var(--red);}
 .month-grid{display:grid;grid-template-columns:repeat(7,1fr);}
-.month-cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:5px 5px;cursor:pointer;transition:background .1s;background:var(--surface);}
+.month-cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:5px 5px;cursor:pointer;transition:background .1s;background:var(--surface);min-height:96px;}
 .month-cell:hover{background:var(--accent-bg);}
 .month-cell.other{opacity:.35;cursor:default;background:var(--surface2);}
 .month-cell.other:hover{background:var(--surface2);}
@@ -175,6 +175,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(2px);}
 .modal{background:var(--surface);border-radius:var(--radius);padding:22px;width:420px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);}
 .modal-title{font-size:15px;font-weight:600;margin-bottom:14px;font-family:var(--font-ui);}
+.form-grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
 .modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;padding-top:14px;border-top:1px solid var(--border);position:sticky;bottom:0;background:var(--surface);padding-bottom:2px;}
 .form-row{margin-bottom:11px;}
 .form-row label{display:block;font-size:10px;font-weight:600;color:var(--text3);margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px;}
@@ -267,6 +268,8 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
     <button class="tb-nav" onclick="navigate(1)">›</button>
     <div class="tb-title" id="main-title"></div>
     <div id="sync-status"><div class="sync-dot" id="sync-dot"></div><span id="sync-txt">Synced</span></div>
+    <button class="tb-btn" onclick="exportData()" title="Backup">⬇</button>
+    <label class="tb-btn" style="cursor:pointer" title="Restore">⬆<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
     <button class="tb-btn" onclick="window.print()">🖨</button>
     <button class="tb-btn" onclick="toggleTheme()" id="theme-btn">🌙</button>
   </div>
@@ -330,11 +333,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
         <button class="nav-btn" data-view="period" onclick="setView('period')"><span class="nav-icon" style="color:var(--pink)">🌸</span>Period</button>
         <button class="nav-btn" data-view="travel" onclick="setView('travel')"><span class="nav-icon" style="color:#0891B2">✈️</span>Travel</button>
       </div>
-      <div style="padding:4px 10px;display:flex;gap:6px;flex-wrap:wrap">
-  <button onclick="exportData()" class="nav-btn" style="font-size:10px;padding:3px 8px">⬇ Backup</button>
-  <label class="nav-btn" style="font-size:10px;padding:3px 8px;cursor:pointer">⬆ Restore<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
-</div>
-<div id="backup-status"></div>
+      <div id="backup-status"></div>
     </aside>
 
     <div class="main">
@@ -674,7 +673,7 @@ async function loadAll(){
   setSyncing();
   try{
     const uid=currentUser.id;
-    const[teRes,tcRes,peRes,tdRes,prRes,gRes,oRes,ccRes,anRes,plRes,hnRes,cmRes]=await Promise.all([
+    const[teRes,tcRes,peRes,tdRes,prRes,gRes,oRes,ccRes,anRes,plRes,hnRes,cmRes,trRes]=await Promise.all([
       sb.from('timed_events').select('*').eq('user_id',uid),
       sb.from('timed_categories').select('*').eq('user_id',uid),
       sb.from('events').select('*').eq('user_id',uid),
@@ -687,6 +686,7 @@ async function loadAll(){
       sb.from('period_logs').select('*').eq('user_id',uid),
       sb.from('home_notes').select('*').eq('user_id',uid).maybeSingle(),
       sb.from('class_memos').select('*').eq('user_id',uid),
+      sb.from('travels').select('*').eq('user_id',uid),
     ]);
 
     data.timedCats=(tcRes.data||[]).map(c=>({id:c.id,name:c.name,color:c.color||'#4472C4',emoji:c.emoji||''}));
@@ -708,8 +708,11 @@ async function loadAll(){
     data.cellColors={};(ccRes.data||[]).forEach(c=>{data.cellColors[c.date]=c.color;});
     data.anniversaries=(anRes.data||[]).map(a=>({id:a.id,name:a.name,emoji:a.emoji||'🎉',month:a.month,day:a.day,year:a.year||null,repeatYearly:a.repeat_yearly}));
     data.periodLogs=(plRes.data||[]).map(p=>({id:p.id,startDate:p.start_date})).sort((a,b)=>b.startDate.localeCompare(a.startDate));
+    data.travels=(trRes.data||[]).map(t=>({id:t.id,name:t.name,destination:t.destination||'',startDate:t.start_date,endDate:t.end_date,color:t.color||'#4472C4',memo:t.memo||''})).sort((a,b)=>a.startDate.localeCompare(b.startDate));
     data.homeNote=hnRes.data?.note1||'';
     data.classMemos={};(cmRes.data||[]).forEach(m=>{data.classMemos[`${m.project_id}_${m.week}`]=m.content||'';});
+    // class_memos week=0은 ev_memo
+    (cmRes.data||[]).forEach(m=>{if(m.week===0)data.classMemos[`ev_memo_${m.project_id}`]=m.content||'';});
 
     setSynced();renderAll();
   }catch(e){console.error(e);setSyncErr('Load Error');}
@@ -876,21 +879,8 @@ function renderSidebar(){
   document.getElementById('te-cat-list').innerHTML=th;
 }
 function renderFilterBar(){
-  const bar=document.getElementById('filter-bar');
-  if(!state.projFilter&&!state.timedFilter){bar.style.display='none';return;}
-  bar.style.display='flex';
-  let html='<span style="font-size:12px;color:var(--text3)">Filter:</span>';
-  if(state.projFilter){
-    const p=proj(state.projFilter);
-    html+=`<span class="filter-chip" style="background:${p.color}">${escH(p.name)}</span>
-      <button onclick="setProjFilter(null)" class="btn-cancel" style="font-size:11px;padding:2px 8px;border-radius:12px">✕</button>`;
-  }
-  if(state.timedFilter){
-    const c=timedCat(state.timedFilter);
-    html+=`<span class="filter-chip" style="background:${c.color}">${c.emoji?c.emoji+' ':''}${escH(c.name)}</span>
-      <button onclick="setTimedFilter(null)" class="btn-cancel" style="font-size:11px;padding:2px 8px;border-radius:12px">✕</button>`;
-  }
-  bar.innerHTML=html;
+  // filter-bar는 month 뷰 내부 네비에 통합됨
+  document.getElementById('filter-bar').style.display='none';
 }
 
 // ── Home ──────────────────────────────────────────────────
@@ -953,54 +943,84 @@ async function addHomeTask(){
 
 // ── Month ─────────────────────────────────────────────────
 function renderMonth(){
+  const todS=todayStr();
   const yr=state.cursor.getFullYear(),mo=state.cursor.getMonth();
-  const first=new Date(yr,mo,1),last=new Date(yr,mo+1,0),todS=todayStr();
-  const offset=(first.getDay()||7)-1;
-  let html=`<div class="card month-view"><div class="month-hdr">`;
-  ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach((d,i)=>html+=`<div class="month-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`);
-  html+=`</div><div class="month-grid">`;
-  let cells=[];
-  for(let i=0;i<offset;i++){let d=new Date(yr,mo,1-offset+i);cells.push({date:d,other:true});}
-  for(let i=1;i<=last.getDate();i++)cells.push({date:new Date(yr,mo,i),other:false});
-  const rem=7-(cells.length%7);if(rem<7)for(let i=1;i<=rem;i++)cells.push({date:new Date(yr,mo+1,i),other:true});
-  cells.forEach(cell=>{
-    const ds=fmtDate(cell.date),isT=ds===todS,isSel=ds===state.selected;
-    const dow=cell.date.getDay(),di=dow===0?6:dow-1;
-    const hol=!cell.other?holName(ds):'';
-    const annivs=!cell.other?getAnnivs(ds):[];
-    const numColor=hol?'color:var(--red)':di===5?'color:var(--accent)':di===6?'color:var(--red)':'';
-    const cellBg=!cell.other&&data.cellColors[ds]?data.cellColors[ds]:'';
-    html+=`<div class="month-cell${cell.other?' other':''}${isT?' today':''}${isSel?' selected':''}" style="${cellBg?`background:${cellBg}1A;`:''}"
-      onclick="selectDay('${ds}');${!cell.other?`openAddModal('${ds}')`:''}"
-      oncontextmenu="event.preventDefault();${!cell.other?`openCellColorPicker('${ds}',event)`:''}">`;
-    let lbls='';
-    if(!cell.other){
-      if(hol)lbls+=`<span style="font-size:9px;color:var(--red);font-weight:500;margin-left:3px">${hol}</span>`;
-      annivs.forEach(a=>lbls+=`<span style="font-size:9px;color:var(--accent);font-weight:500;margin-left:3px">${a.emoji||''}${a.name}</span>`);
-    }
-    html+=`<div class="month-cell-num" style="${numColor}${cellBg&&!cell.other?`color:${cellBg};font-weight:700;`:''}">
-      <span>${cell.date.getDate()}</span>${cellBg&&!cell.other?`<span class="cell-dot" style="background:${cellBg}"></span>`:''}${lbls}
-    </div>`;
-    // timedFilter 있으면 timed events만, projFilter 있으면 proj/tasks만
-    if(!state.projFilter){
-      timedEventsOn(ds).forEach(te=>{const cat=timedCat(te.categoryId),c=cat.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)};display:flex;gap:2px" onclick="event.stopPropagation();openEditItem('timed','${te.id}')"><span style="opacity:.75;font-size:9px;flex-shrink:0">${te.time}</span><span style="overflow:hidden;text-overflow:ellipsis">${escH(te.title)}</span></div>`;});
-    }
-    if(!state.timedFilter){
-      projEventsOn(ds).forEach(ev=>{const p=proj(ev.projectId),c=p.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}" onclick="event.stopPropagation();openEditItem('proj','${ev.id}')">${escH(ev.title)}</div>`;});
-      tasksOn(ds,true).forEach(td=>{const p=proj(td.projectId),c=p.color||'#999';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}">${td.done?'✓ ':''}${escH(td.title)}</div>`;});
-    }
-    html+=`</div>`;
-  });
-  html+=`</div></div>`;
+  // 뷰 내 네비게이션 헤더
+  let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <button onclick="navigate(-1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">‹</button>
+    <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <button onclick="navigate(1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">›</button>
+    <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월~</span>
+    ${state.projFilter?`<span class="filter-chip" style="background:${proj(state.projFilter).color}">${escH(proj(state.projFilter).name)}</span><button onclick="setProjFilter(null)" class="btn-cancel" style="font-size:11px;padding:2px 8px;border-radius:12px">✕</button>`:''}
+    ${state.timedFilter?`<span class="filter-chip" style="background:${timedCat(state.timedFilter).color}">${escH(timedCat(state.timedFilter).name)}</span><button onclick="setTimedFilter(null)" class="btn-cancel" style="font-size:11px;padding:2px 8px;border-radius:12px">✕</button>`:''}
+  </div>`;
 
-  // If timed filter active, show timed events list below
+  // 현재 달 기준 앞뒤로 보여줄 달 범위: 현재달 + 이후 2달 (총 3달 연속)
+  const months=[];
+  for(let i=0;i<3;i++){
+    const d=new Date(yr,mo+i,1);
+    months.push({year:d.getFullYear(),month:d.getMonth()});
+  }
+
+
+  months.forEach(({year:myr,month:mmo})=>{
+    const first=new Date(myr,mmo,1),last=new Date(myr,mmo+1,0);
+    const offset=(first.getDay()||7)-1;
+
+    html+=`<div style="margin-bottom:2px">`;
+    // 월 헤더
+    html+=`<div style="padding:10px 14px 6px;font-size:14px;font-weight:600;font-family:var(--font-ui);display:flex;align-items:center;gap:8px">
+      ${myr}년 ${mmo+1}월
+      ${myr===yr&&mmo===mo?`<span style="font-size:10px;background:var(--accent);color:#fff;padding:1px 7px;border-radius:8px">현재</span>`:''}
+    </div>`;
+
+    html+=`<div class="card month-view"><div class="month-hdr">`;
+    ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach((d,i)=>html+=`<div class="month-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`);
+    html+=`</div><div class="month-grid">`;
+
+    let cells=[];
+    for(let i=0;i<offset;i++){let d=new Date(myr,mmo,1-offset+i);cells.push({date:d,other:true});}
+    for(let i=1;i<=last.getDate();i++)cells.push({date:new Date(myr,mmo,i),other:false});
+    const rem=7-(cells.length%7);if(rem<7)for(let i=1;i<=rem;i++)cells.push({date:new Date(myr,mmo+1,i),other:true});
+
+    cells.forEach(cell=>{
+      const ds=fmtDate(cell.date),isT=ds===todS,isSel=ds===state.selected;
+      const dow=cell.date.getDay(),di=dow===0?6:dow-1;
+      const hol=!cell.other?holName(ds):'';
+      const annivs=!cell.other?getAnnivs(ds):[];
+      const numColor=hol?'color:var(--red)':di===5?'color:var(--accent)':di===6?'color:var(--red)':'';
+      const cellBg=!cell.other&&data.cellColors[ds]?data.cellColors[ds]:'';
+      html+=`<div class="month-cell${cell.other?' other':''}${isT?' today':''}${isSel?' selected':''}" style="${cellBg?`background:${cellBg}1A;`:''}"
+        onclick="selectDay('${ds}');${!cell.other?`openAddModal('${ds}')`:''}"
+        oncontextmenu="event.preventDefault();${!cell.other?`openCellColorPicker('${ds}',event)`:''}">`;
+      let lbls='';
+      if(!cell.other){
+        if(hol)lbls+=`<span style="font-size:9px;color:var(--red);font-weight:500;margin-left:3px">${hol}</span>`;
+        annivs.forEach(a=>lbls+=`<span style="font-size:9px;color:var(--accent);font-weight:500;margin-left:3px">${a.emoji||''}${a.name}</span>`);
+      }
+      html+=`<div class="month-cell-num" style="${numColor}${cellBg&&!cell.other?`color:${cellBg};font-weight:700;`:''}">
+        <span>${cell.date.getDate()}</span>${cellBg&&!cell.other?`<span class="cell-dot" style="background:${cellBg}"></span>`:''}${lbls}
+      </div>`;
+      if(!state.projFilter){
+        timedEventsOn(ds).forEach(te=>{const cat=timedCat(te.categoryId),c=cat.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)};display:flex;gap:2px" onclick="event.stopPropagation();openEditItem('timed','${te.id}')"><span style="opacity:.75;font-size:9px;flex-shrink:0">${te.time}</span><span style="overflow:hidden;text-overflow:ellipsis">${escH(te.title)}</span></div>`;});
+      }
+      if(!state.timedFilter){
+        projEventsOn(ds).forEach(ev=>{const p=proj(ev.projectId),c=p.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}" onclick="event.stopPropagation();openEditItem('proj','${ev.id}')">${escH(ev.title)}</div>`;});
+        tasksOn(ds,true).forEach(td=>{const p=proj(td.projectId),c=p.color||'#999';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}">${td.done?'✓ ':''}${escH(td.title)}</div>`;});
+      }
+      html+=`</div>`;
+    });
+    html+=`</div></div></div>`;
+  });
+
+  // 필터별 통합 일정 목록
   if(state.timedFilter){
     const cat=timedCat(state.timedFilter);
-    const yr=state.cursor.getFullYear();
-    const tes=data.timedEvents.filter(t=>t.categoryId===state.timedFilter&&t.date.startsWith(yr+'')).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+    const curYr=yr;
+    const tes=data.timedEvents.filter(t=>t.categoryId===state.timedFilter&&t.date.startsWith(curYr+'')).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
     html+=`<div class="card" style="margin-top:14px;overflow:hidden">
       <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px">
-        <span style="width:10px;height:10px;border-radius:50%;background:${cat.color};display:inline-block"></span>${cat.emoji?cat.emoji+' ':''}${escH(cat.name)} ${yr}년 일정
+        <span style="width:10px;height:10px;border-radius:50%;background:${cat.color};display:inline-block"></span>${cat.emoji?cat.emoji+' ':''}${escH(cat.name)} ${curYr}년 일정
         <span style="font-size:11px;color:var(--text3);font-weight:400;margin-left:auto">${tes.length}개</span>
       </div>`;
     if(tes.length===0)html+=`<div class="empty">No events</div>`;
@@ -1023,7 +1043,6 @@ function renderMonth(){
     html+=`</div>`;
   }
 
-  // If project filter active, show all events below
   if(state.projFilter){
     const p=proj(state.projFilter);
     const evs=data.projEvents.filter(e=>e.projectId===state.projFilter).sort((a,b)=>a.date.localeCompare(b.date));
@@ -1035,7 +1054,7 @@ function renderMonth(){
     if(evs.length===0)html+=`<div class="empty">No events</div>`;
     else evs.forEach(ev=>{
       const memoKey=`ev_memo_${ev.id}`;
-      const memoVal=data.classMemos[memoKey]||'';
+      const memoVal=data.classMemos[memoKey]||ev.note||'';
       html+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid var(--border)">
         <div style="cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:0" onclick="openEditItem('proj','${ev.id}')">
           <span style="font-size:11px;color:var(--text3);width:76px;flex-shrink:0">${ev.date}</span>
@@ -1049,21 +1068,9 @@ function renderMonth(){
       </div>`;
     });
     html+=`</div>`;
-
-
   }
 
   document.getElementById('main-content').innerHTML=html;
-}
-async function saveEvMemo(evId,val){
-  const key=`ev_memo_${evId}`;
-  data.classMemos[key]=val;
-  // event_id를 project_id로 사용해서 저장 (week=0)
-  await saveClassMemo(evId,0,val);
-}
-async function saveClassMemoInp(pid,week,content){
-  data.classMemos[`${pid}_${week}`]=content;
-  await saveClassMemo(pid,week,content);
 }
 
 // ── Year ──────────────────────────────────────────────────
@@ -1632,22 +1639,27 @@ async function saveTravel(){
     data.travels.push({id:makeId(),name,destination:dest,startDate,endDate,color:_travelColor,memo});
   }
   closeTravelModal();renderTravel();
-  // localStorage 임시 저장 (Supabase travel 테이블 추가 전)
-  try{localStorage.setItem('travels_'+currentUser.id,JSON.stringify(data.travels));}catch(e){}
+  setSyncing();
+  if(_editTravelId){
+    const{error}=await sb.from('travels').update({name,destination:dest,start_date:startDate,end_date:endDate,color:_travelColor,memo}).eq('id',_editTravelId).eq('user_id',currentUser.id);
+    if(error){setSyncErr('Save Error');alert('Error: '+error.message);}else setSynced();
+  } else {
+    const newT=data.travels[data.travels.length-1];
+    const{error}=await sb.from('travels').insert({id:newT.id,user_id:currentUser.id,name,destination:dest,start_date:startDate,end_date:endDate,color:_travelColor,memo});
+    if(error){data.travels=data.travels.filter(t=>t.id!==newT.id);setSyncErr('Save Error');alert('Error: '+error.message);}else setSynced();
+  }
 }
 async function deleteTravel(){
   if(!_editTravelId)return;
+  const backup=data.travels.find(t=>t.id===_editTravelId);
   data.travels=data.travels.filter(t=>t.id!==_editTravelId);
   closeTravelModal();renderTravel();
-  try{localStorage.setItem('travels_'+currentUser.id,JSON.stringify(data.travels));}catch(e){}
+  setSyncing();
+  const{error}=await sb.from('travels').delete().eq('id',_editTravelId).eq('user_id',currentUser.id);
+  if(error){if(backup)data.travels.push(backup);renderTravel();setSyncErr('Delete Error');alert('Delete failed');}
+  else setSynced();
 }
-function loadTravelsLocal(){
-  if(!currentUser)return;
-  try{
-    const saved=localStorage.getItem('travels_'+currentUser.id);
-    if(saved)data.travels=JSON.parse(saved);
-  }catch(e){}
-}
+function loadTravelsLocal(){}
 
 
 // ── Event Modal ───────────────────────────────────────────
@@ -1756,8 +1768,9 @@ async function saveItem(){
     const start=document.getElementById('m-time').value;
     const note=document.getElementById('m-note').value;
     const ev={id:_mMode==='add'?makeId():_mId,title,date,start,projectId:pid,color:_mColor,note};
-    if(_mMode==='add'){data.projEvents.push(ev);closeModal();renderAll();const err=await saveProjEvent(ev);if(err){data.projEvents=data.projEvents.filter(e=>e.id!==ev.id);renderAll();alert('Error: '+err);}}
-    else{const i=data.projEvents.findIndex(e=>e.id===_mId);const old=data.projEvents[i];if(i>=0)data.projEvents[i]=ev;data.tasks.forEach(t=>{if(t.eventId===_mId){t.date=date;saveTask(t);}});closeModal();renderAll();const err=await saveProjEvent(ev);if(err){if(i>=0)data.projEvents[i]=old;renderAll();alert('Error: '+err);}}
+    if(note){data.classMemos[`ev_memo_${ev.id}`]=note;}// note → 통합일정 메모 연동
+    if(_mMode==='add'){data.projEvents.push(ev);closeModal();renderAll();const err=await saveProjEvent(ev);if(err){data.projEvents=data.projEvents.filter(e=>e.id!==ev.id);renderAll();alert('Error: '+err);}else if(note)saveClassMemo(ev.id,0,note);}
+    else{const i=data.projEvents.findIndex(e=>e.id===_mId);const old=data.projEvents[i];if(i>=0)data.projEvents[i]=ev;data.tasks.forEach(t=>{if(t.eventId===_mId){t.date=date;saveTask(t);}});closeModal();renderAll();const err=await saveProjEvent(ev);if(err){if(i>=0)data.projEvents[i]=old;renderAll();alert('Error: '+err);}else if(note)saveClassMemo(ev.id,0,note);}
   } else {// task
     const pid=document.getElementById('m-project').value;
     const td={id:_mMode==='add'?makeId():_mId,title,date,projectId:pid,done:false,eventId:''};
@@ -2012,18 +2025,33 @@ function renderTcList(){
   if(data.timedCats.length===0){h=`<div class="empty">No categories</div>`;}
   else data.timedCats.forEach((c,i)=>{
     const cnt=data.timedEvents.filter(t=>t.categoryId===c.id).length;
-    h+=`<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--border)">
-      <span style="width:10px;height:10px;border-radius:50%;background:${c.color};flex-shrink:0"></span>
-      <span style="font-size:14px;flex-shrink:0">${c.emoji||''}</span>
-      <input type="text" value="${escH(c.name)}" style="flex:1;padding:3px 7px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font)"
-        onblur="renameTimedCat('${c.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
-      <span style="font-size:10px;color:var(--text3)">${cnt}</span>
-      <button onclick="moveTimedCatUp('${c.id}')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:11px;padding:1px 3px" ${i===0?'disabled':''}">▲</button>
-      <button onclick="moveTimedCatDown('${c.id}')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:11px;padding:1px 3px" ${i===data.timedCats.length-1?'disabled':''}">▼</button>
-      <button onclick="deleteTimedCat('${c.id}')" class="todo-del" style="font-size:11px">✕</button>
+    h+=`<div style="padding:6px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+        <input type="text" value="${c.emoji||''}" maxlength="2" style="width:30px;padding:2px 3px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:14px;text-align:center;background:var(--bg);outline:none"
+          onblur="updateTimedCatEmoji('${c.id}',this.value)">
+        <input type="text" value="${escH(c.name)}" style="flex:1;padding:3px 7px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font)"
+          onblur="renameTimedCat('${c.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+        <span style="font-size:10px;color:var(--text3)">${cnt}</span>
+        <button onclick="moveTimedCatUp('${c.id}')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:11px" ${i===0?'disabled':''}>▲</button>
+        <button onclick="moveTimedCatDown('${c.id}')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:11px" ${i===data.timedCats.length-1?'disabled':''}>▼</button>
+        <button onclick="deleteTimedCat('${c.id}')" class="todo-del" style="font-size:11px">✕</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">
+        ${PALETTE.map(pc=>`<div class="color-sw${pc===c.color?' selected':''}" style="width:16px;height:16px;background:${pc};border-radius:50%;cursor:pointer;border:2px solid ${pc===c.color?'var(--text)':'transparent'}" onclick="updateTimedCatColor('${c.id}','${pc}')"></div>`).join('')}
+      </div>
     </div>`;
   });
   document.getElementById('tc-list').innerHTML=h;
+}
+async function updateTimedCatColor(id,color){
+  const c=data.timedCats.find(x=>x.id===id);if(!c||c.color===color)return;
+  c.color=color;renderTcList();renderSidebar();renderAll();
+  await sb.from('timed_categories').update({color}).eq('id',id).eq('user_id',currentUser.id);
+}
+async function updateTimedCatEmoji(id,emoji){
+  const c=data.timedCats.find(x=>x.id===id);if(!c)return;
+  c.emoji=emoji;renderTcList();renderSidebar();
+  await sb.from('timed_categories').update({emoji}).eq('id',id).eq('user_id',currentUser.id);
 }
 async function renameTimedCat(id,name){
   const c=data.timedCats.find(x=>x.id===id);if(!c||c.name===name)return;
