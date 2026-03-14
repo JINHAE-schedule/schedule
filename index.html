@@ -824,7 +824,7 @@ function closeSidebar(){
 }
 
 // ── Utilities ─────────────────────────────────────────────
-function makeId(){ return 'id-'+Date.now()+'-'+Math.random().toString(36).slice(2,7); }
+function makeId(){ return typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID():'id-'+Date.now()+'-'+Math.random().toString(36).slice(2,9); }
 
 // ── Timed Categories ──────────────────────────────────────
 let newTcColor = '#4472C4';
@@ -1196,7 +1196,8 @@ async function saveEvent(ev) {
     start: ev.start, end: ev.end,
     project_id: ev.projectId, color: ev.color, note: ev.note
   });
-  if (error) setSyncError('저장 오류'); else setSynced();
+  if (error){ setSyncError('저장 오류'); return error.message; } else setSynced();
+  return null;
 }
 
 async function deleteEvent(id) {
@@ -1216,7 +1217,8 @@ async function saveTodo(td) {
     project_id: td.projectId, done: td.done,
     event_id: td.eventId || ''
   });
-  if (error) setSyncError('저장 오류'); else setSynced();
+  if (error){ setSyncError('저장 오류'); return error.message; } else setSynced();
+  return null;
 }
 
 async function deleteTodoRemote(id) {
@@ -1765,7 +1767,7 @@ async function addSubtask(){
   let inp=document.getElementById('m-subtask-input');
   let title=inp.value.trim();if(!title)return;
   let ev=data.events.find(e=>e.id===editingId);
-  let td={id:'t'+Date.now(),title,date:ev?.date||todayStr(),projectId:ev?.projectId||data.projects[0]?.id||'',done:false,eventId:editingId};
+  let td={id:makeId(),title,date:ev?.date||todayStr(),projectId:ev?.projectId||data.projects[0]?.id||'',done:false,eventId:editingId};
   data.todos.push(td);
   inp.value='';
   renderSubtasksList(data.todos.filter(t=>t.eventId===editingId));
@@ -1795,24 +1797,31 @@ async function saveItem(){
   let date=document.getElementById('m-date').value;
   let pid=document.getElementById('m-project').value;
   if(modalType==='event'){
-    let item={id:modalMode==='add'?'e'+Date.now():editingId,title,date,
+    let item={id:modalMode==='add'?makeId():editingId,title,date,
       start:document.getElementById('m-start').value,
       end:document.getElementById('m-end').value,
       projectId:pid,color:selectedColor,
       note:document.getElementById('m-note').value};
-    if(modalMode==='add') data.events.push(item);
-    else{
+    if(modalMode==='add'){
+      data.events.push(item);
+      closeModal();renderAll();
+      let err=await saveEvent(item);
+      if(err){data.events=data.events.filter(e=>e.id!==item.id);renderAll();alert('저장 실패: '+err);}
+    } else {
       let idx=data.events.findIndex(e=>e.id===editingId);
+      let old=data.events[idx];
       if(idx>=0) data.events[idx]=item;
       data.todos.forEach(t=>{if(t.eventId===editingId){t.date=date;saveTodo(t);}});
+      closeModal();renderAll();
+      let err=await saveEvent(item);
+      if(err){if(idx>=0)data.events[idx]=old;renderAll();alert('저장 실패: '+err);}
     }
-    closeModal();renderAll();
-    await saveEvent(item);
   } else {
-    let td={id:'t'+Date.now(),title,date,projectId:pid,done:false,eventId:''};
+    let td={id:makeId(),title,date,projectId:pid,done:false,eventId:''};
     data.todos.push(td);
     closeModal();renderAll();
-    await saveTodo(td);
+    let err=await saveTodo(td);
+    if(err){data.todos=data.todos.filter(t=>t.id!==td.id);renderAll();alert('저장 실패: '+err);}
   }
 }
 
@@ -1982,7 +1991,7 @@ function toggleTodoGroup(id){let el=document.getElementById(id);if(el)el.style.d
 async function doAddLinkedTodo(eventId, input){
   let title=input.value.trim();if(!title)return;
   let ev=data.events.find(e=>e.id===eventId);
-  let td={id:'t'+Date.now(),title,date:ev?.date||todayStr(),projectId:ev?.projectId||data.projects[0]?.id||'',done:false,eventId};
+  let td={id:makeId(),title,date:ev?.date||todayStr(),projectId:ev?.projectId||data.projects[0]?.id||'',done:false,eventId};
   data.todos.push(td);
   input.value='';renderAll();renderTodosPanel();
   await saveTodo(td);
@@ -2004,7 +2013,7 @@ function setTodoProjFilter(pid){todoProjFilter=pid;renderTodosPanel();}
 async function addQuickTodo(){
   let inp=document.getElementById('quick-input'),t=inp.value.trim();if(!t)return;
   let pid=todoProjFilter||state.filterProject||data.projects[0]?.id||'';
-  let td={id:'t'+Date.now(),title:t,date:state.selected||todayStr(),projectId:pid,done:false,eventId:''};
+  let td={id:makeId(),title:t,date:state.selected||todayStr(),projectId:pid,done:false,eventId:''};
   data.todos.push(td);
   inp.value='';renderAll();renderTodosPanel();
   await saveTodo(td);
@@ -2058,7 +2067,7 @@ async function addProject(){
   let name=document.getElementById('new-proj-name').value.trim();
   if(!name) return;
   let fullName=emoji?emoji+' '+name:name;
-  let p={id:'p'+Date.now(),name:fullName,color:newProjColor};
+  let p={id:makeId(),name:fullName,color:newProjColor};
   data.projects.push(p);
   document.getElementById('new-proj-name').value='';
   document.getElementById('new-proj-emoji').value='';
@@ -2077,6 +2086,9 @@ function exportData(){
     office: data.office,
     cellColors: data.cellColors,
     anniversaries: data.anniversaries,
+    timedEvents: data.timedEvents,
+    timedCategories: data.timedCategories,
+    projectMemos: data.projectMemos,
     exportedAt: new Date().toISOString()
   };
   let fn='내스케줄_백업_'+new Date().toISOString().slice(0,10)+'.json';
@@ -2121,6 +2133,31 @@ async function importData(e){
           month:a.month, day:a.day, year:a.year||null, repeat_yearly:a.repeatYearly
         }));
         await sb.from('anniversaries').insert(annRows);
+      }
+      // Timed Events 복원
+      if(imported.timedEvents && imported.timedEvents.length > 0) {
+        await sb.from('timed_events').delete().eq('user_id', currentUser.id);
+        let teRows = imported.timedEvents.map(t=>({
+          id:t.id, user_id:currentUser.id, title:t.title, date:t.date,
+          time:t.time, category_id:t.categoryId||null
+        }));
+        await sb.from('timed_events').insert(teRows);
+      }
+      // Timed Categories 복원
+      if(imported.timedCategories && imported.timedCategories.length > 0) {
+        await sb.from('timed_categories').delete().eq('user_id', currentUser.id);
+        let tcRows = imported.timedCategories.map(c=>({
+          id:c.id, user_id:currentUser.id, name:c.name, color:c.color, emoji:c.emoji||''
+        }));
+        await sb.from('timed_categories').insert(tcRows);
+      }
+      // Project Memos 복원
+      if(imported.projectMemos) {
+        await sb.from('project_memos').delete().eq('user_id', currentUser.id);
+        let pmRows = Object.entries(imported.projectMemos).map(([pid,content])=>({
+          user_id:currentUser.id, project_id:pid, content
+        }));
+        if(pmRows.length>0) await sb.from('project_memos').insert(pmRows);
       }
       // 서버 기준으로 재동기화
       await loadAllData();
@@ -2167,8 +2204,9 @@ function renderGolf(){
     } else if(!weather){
       cellContent=`<div class="golf-cell-empty" onclick="openGolfModal('${ds}')">+</div>`;
     }
-    html+=`<div class="work-cell golf-cell${isTod?' today':''}${dow===6?' sat':dow===0?' sun':''}${hasWork?' golf-worked':''}">
-      <div class="work-cell-num">${d}${rounds.length>1?` <span style="font-size:9px;color:#BA7517;">×${rounds.length}</span>`:''}</div>
+    let gIsHol=isHoliday(ds);
+    html+=`<div class="work-cell golf-cell${isTod?' today':''}${gIsHol&&!isTod?' sun':dow===6&&!isTod?' sat':dow===0&&!isTod?' sun':''}${hasWork?' golf-worked':''}">
+      <div class="work-cell-num" style="${gIsHol&&!isTod?'color:var(--red);':''}">${d}${gIsHol&&!isTod?`<span style="font-size:8px;margin-left:2px;color:var(--red);">${holidayName(ds)}</span>`:''}${rounds.length>1?` <span style="font-size:9px;color:#BA7517;">×${rounds.length}</span>`:''}</div>
       ${cellContent}
     </div>`;
   }
@@ -2296,9 +2334,10 @@ function renderStudio(){
     let dow=new Date(yr,mo,d).getDay(),isTod=ds===todayStr();
     let mins=rec.in&&rec.out?Math.min(timeDiff(rec.in,rec.out),600):0;
     let hrLabel=mins>0?`${Math.floor(mins/60)}h${mins%60>0?String(mins%60).padStart(2,'0')+'m':''}` :'';
-    html+=`<div class="work-cell office-cell${isTod?' today':''}${dow===6?' sat':dow===0?' sun':''}${mins>0?' worked':''}">
+    let sIsHol=isHoliday(ds);
+    html+=`<div class="work-cell office-cell${isTod?' today':''}${sIsHol&&!isTod?' sun':dow===6&&!isTod?' sat':dow===0&&!isTod?' sun':''}${mins>0?' worked':''}">
       <div class="work-cell-num" style="display:flex;align-items:center;justify-content:space-between;">
-        <span>${d}</span>
+        <span style="${sIsHol&&!isTod?'color:var(--red);':''}">${d}${sIsHol&&!isTod?`<span style="font-size:8px;margin-left:2px;color:var(--red);">${holidayName(ds)}</span>`:''}</span>
         ${mins>0?`<span onclick="doClearOffice('${ds}')" style="font-size:9px;color:var(--text3);cursor:pointer;padding:1px 3px;border-radius:3px;" title="삭제">✕</span>`:''}
       </div>
       <input class="work-time-input" type="time" title="출근" value="${rec.in||''}" onchange="doSaveOffice('${ds}','in',this.value)">
