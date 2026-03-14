@@ -751,6 +751,7 @@ function selectDay(ds){state.selected=ds;state.cursor=parseDate(ds);renderAll();
 function jumpToDay(ds){state.selected=ds;state.cursor=parseDate(ds);setView('day');}
 function setProjFilter(pid){
   state.projFilter=pid;
+  if(pid)state.timedFilter=null; // 동시 필터 방지
   if(pid&&['golf','studio','period','day'].includes(state.view)){
     state.view='month';
     document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='month'));
@@ -760,6 +761,7 @@ function setProjFilter(pid){
 }
 function setTimedFilter(id){
   state.timedFilter=id;
+  if(id)state.projFilter=null; // 동시 필터 방지
   if(id&&['golf','studio','period','day'].includes(state.view)){
     state.view='month';
     document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='month'));
@@ -923,9 +925,14 @@ function renderMonth(){
     html+=`<div class="month-cell-num" style="${numColor}${cellBg&&!cell.other?`color:${cellBg};font-weight:700;`:''}">
       <span>${cell.date.getDate()}</span>${cellBg&&!cell.other?`<span class="cell-dot" style="background:${cellBg}"></span>`:''}${lbls}
     </div>`;
-    timedEventsOn(ds).forEach(te=>{const cat=timedCat(te.categoryId),c=cat.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)};display:flex;gap:2px" onclick="event.stopPropagation();openEditItem('timed','${te.id}')"><span style="opacity:.75;font-size:9px;flex-shrink:0">${te.time}</span><span style="overflow:hidden;text-overflow:ellipsis">${escH(te.title)}</span></div>`;});
-    projEventsOn(ds).forEach(ev=>{const p=proj(ev.projectId),c=p.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}" onclick="event.stopPropagation();openEditItem('proj','${ev.id}')">${escH(ev.title)}</div>`;});
-    tasksOn(ds,true).forEach(td=>{const p=proj(td.projectId),c=p.color||'#999';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}">${td.done?'✓ ':''}${escH(td.title)}</div>`;});
+    // timedFilter 있으면 timed events만, projFilter 있으면 proj/tasks만
+    if(!state.projFilter){
+      timedEventsOn(ds).forEach(te=>{const cat=timedCat(te.categoryId),c=cat.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)};display:flex;gap:2px" onclick="event.stopPropagation();openEditItem('timed','${te.id}')"><span style="opacity:.75;font-size:9px;flex-shrink:0">${te.time}</span><span style="overflow:hidden;text-overflow:ellipsis">${escH(te.title)}</span></div>`;});
+    }
+    if(!state.timedFilter){
+      projEventsOn(ds).forEach(ev=>{const p=proj(ev.projectId),c=p.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}" onclick="event.stopPropagation();openEditItem('proj','${ev.id}')">${escH(ev.title)}</div>`;});
+      tasksOn(ds,true).forEach(td=>{const p=proj(td.projectId),c=p.color||'#999';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}">${td.done?'✓ ':''}${escH(td.title)}</div>`;});
+    }
     html+=`</div>`;
   });
   html+=`</div></div>`;
@@ -1106,11 +1113,9 @@ function renderDay(){
     });
     html+=`</div>`;
   });
-  html+=`</div>`;
-
   html+=`</div>`; // close timeblock card
   // Tasks - right column
-  html+=`<div class="card" style="overflow:hidden">
+  html+=`<div class="card" style="overflow:hidden;overflow-y:auto;max-height:700px">
     <div style="padding:9px 14px;font-size:13px;font-weight:500;border-bottom:1px solid var(--border)">Tasks</div>`;
   const linkedIds=new Set();
   pevs.forEach(ev=>{
