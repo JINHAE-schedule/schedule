@@ -299,7 +299,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
       <div class="nav-sec">
         <div class="nav-lbl">Tasks</div>
         <button class="nav-btn" data-view="tasks" onclick="setView('tasks')"><span class="nav-icon">📋</span>Task Calendar</button>
-        <button class="nav-btn" onclick="toggleTodos()"><span class="nav-icon">✓</span>Todo List</button>
+        <button class="nav-btn" data-view="todos" onclick="setView('todos')"><span class="nav-icon">✓</span>Todo List</button>
       </div>
       <div class="nav-div"></div>
 
@@ -795,13 +795,14 @@ async function delPeriodLog(id){setSyncing();await sb.from('period_logs').delete
 function setView(v){
   state.view=v;
   if(v==='month'){state.projFilter=null;state.timedFilter=null;state.filterMode=null;}
+  if(v==='todos'){state.cursor=new Date(today);}
   if(window.innerWidth<=768)closeSb();
   document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   renderAll();
 }
 function navigate(dir){
   const c=state.cursor;
-  if(['day'].includes(state.view))c.setDate(c.getDate()+dir);
+  if(['day','todos'].includes(state.view))c.setDate(c.getDate()+dir);
   else if(state.view==='haegobj')c.setDate(c.getDate()+dir*7);
   else if(['month','studio','golf','period','filtered','travel','tasks'].includes(state.view))c.setMonth(c.getMonth()+dir);
   else if(['year'].includes(state.view))c.setFullYear(c.getFullYear()+dir);
@@ -843,12 +844,12 @@ function closeSb(){document.getElementById('sidebar').classList.remove('open');d
 function renderAll(){
   if(!currentUser)return;
   updateTitle();renderSidebar();renderFilterBar();
-  const views={home:renderHome,year:renderYear,month:renderMonth,filtered:renderFiltered,tasks:renderTaskCal,day:renderDay,haegobj:renderHaegobj,golf:renderGolf,studio:renderStudio,period:renderPeriod,travel:renderTravel};
+  const views={home:renderHome,year:renderYear,month:renderMonth,filtered:renderFiltered,tasks:renderTaskCal,todos:renderTodos,day:renderDay,haegobj:renderHaegobj,golf:renderGolf,studio:renderStudio,period:renderPeriod,travel:renderTravel};
   (views[state.view]||renderHome)();
 }
 function updateTitle(){
   const c=state.cursor;
-  const titles={home:'🏠 Home',year:c.getFullYear()+'년',filtered:'',haegobj:'🏷 HAEGOBJ',tasks:'📋 Tasks — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',travel:'✈️ Travel — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',month:c.getFullYear()+'년 '+(c.getMonth()+1)+'월',day:c.getFullYear()+'년 '+(c.getMonth()+1)+'월 '+c.getDate()+'일 ('+['일','월','화','수','목','금','토'][c.getDay()]+')',golf:'⛳ Golf — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',studio:'🏢 Studio — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',period:'🌸 Period — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월'};
+  const titles={home:'🏠 Home',year:c.getFullYear()+'년',filtered:'',haegobj:'🏷 HAEGOBJ',todos:'✓ Todo List',tasks:'📋 Tasks — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',travel:'✈️ Travel — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',month:c.getFullYear()+'년 '+(c.getMonth()+1)+'월',day:c.getFullYear()+'년 '+(c.getMonth()+1)+'월 '+c.getDate()+'일 ('+['일','월','화','수','목','금','토'][c.getDay()]+')',golf:'⛳ Golf — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',studio:'🏢 Studio — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',period:'🌸 Period — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월'};
   document.getElementById('main-title').textContent=titles[state.view]||'';
 }
 function renderSidebar(){
@@ -1313,82 +1314,80 @@ function saveBlock(ds,h,pid,val){if(!window.dayBlocks[ds])window.dayBlocks[ds]={
 // ── HAEGOBJ ──────────────────────────────────────────────
 function renderHaegobj(){
   const todS=todayStr();
-  // cursor 기준 월요일 찾기
+  // cursor 기준 해당 주 월요일
   const base=new Date(state.cursor);
   const dow=base.getDay();
   const diffToMon=dow===0?-6:1-dow;
   base.setDate(base.getDate()+diffToMon);
 
-  // 3주 = 21일
+  // 3주치 날짜 준비
   const weeks=[];
   for(let w=0;w<3;w++){
-    const weekDays=[];
+    const wDays=[];
     for(let d=0;d<7;d++){
       const day=new Date(base);
       day.setDate(base.getDate()+w*7+d);
-      weekDays.push(fmtDate(day));
+      wDays.push(fmtDate(day));
     }
-    weeks.push(weekDays);
+    weeks.push(wDays);
   }
 
-  const startLabel=`${parseDate(weeks[0][0]).getMonth()+1}월 ${parseDate(weeks[0][0]).getDate()}일`;
-  const endLabel=`${parseDate(weeks[2][6]).getMonth()+1}월 ${parseDate(weeks[2][6]).getDate()}일`;
+  const startDs=weeks[0][0],endDs=weeks[2][6];
+  const sl=parseDate(startDs),el=parseDate(endDs);
 
   let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
     <button onclick="navigate(-1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">‹</button>
     <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
     <button onclick="navigate(1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">›</button>
-    <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${startLabel} — ${endLabel}</span>
+    <span style="font-size:13px;font-weight:600;font-family:var(--font-ui);margin-left:4px">
+      ${sl.getFullYear()}년 ${sl.getMonth()+1}월 ${sl.getDate()}일 — ${el.getMonth()+1}월 ${el.getDate()}일
+    </span>
   </div>`;
 
-  // 요일 헤더
-  html+=`<div class="card" style="overflow:hidden">
-    <div style="display:grid;grid-template-columns:repeat(7,1fr);background:var(--surface2);border-bottom:1px solid var(--border)">
-      ${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d,i)=>`
-        <div style="padding:6px 4px;text-align:center;font-size:11px;font-weight:600;font-family:var(--font-ui);color:${i===5?'var(--accent)':i===6?'var(--red)':'var(--text3)'}">${d}</div>
-      `).join('')}
-    </div>`;
+  // 3주 나란히 (가로 스크롤)
+  html+=`<div style="display:flex;gap:12px;overflow-x:auto;padding-bottom:8px">`;
 
-  // 3주 그리드
-  weeks.forEach((week,wi)=>{
-    // 주 구분선
-    if(wi>0)html+=`<div style="height:1px;background:var(--border)"></div>`;
+  weeks.forEach((wDays,wi)=>{
+    const wStart=parseDate(wDays[0]),wEnd=parseDate(wDays[6]);
+    const wLabel=`${wStart.getMonth()+1}/${wStart.getDate()} — ${wEnd.getMonth()+1}/${wEnd.getDate()}`;
 
-    html+=`<div style="display:grid;grid-template-columns:repeat(7,1fr)">`;
-    week.forEach((ds,di)=>{
+    html+=`<div class="card" style="flex-shrink:0;width:340px;overflow:hidden">
+      <div style="padding:8px 10px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text3)">${wLabel}</div>`;
+
+    wDays.forEach((ds,di)=>{
       const d=parseDate(ds);
       const isToday=ds===todS;
-      const isHol_=isHol(ds);
-      const dow=d.getDay();
-      const isSat=dow===6,isSun=dow===0;
-      const numColor=isHol_||isSun?'var(--red)':isSat?'var(--accent)':'var(--text2)';
+      const dowKo=['일','월','화','수','목','금','토'][d.getDay()];
+      const isSat=d.getDay()===6,isSun=d.getDay()===0;
+      const hol=holName(ds);
+      const numColor=hol||isSun?'var(--red)':isSat?'var(--accent)':'var(--text2)';
       const memo=data.haegobjMemos[ds]||'';
-      const borderR=di<6?'border-right:1px solid var(--border);':'';
 
-      html+=`<div style="min-height:120px;padding:6px;${borderR}${isToday?'background:rgba(45,107,228,0.04);':''}display:flex;flex-direction:column;gap:4px">
-        <div style="font-size:11px;font-weight:${isToday?700:500};color:${isToday?'var(--accent)':numColor};display:flex;align-items:center;gap:4px;flex-shrink:0">
-          ${d.getDate()}
-          ${isToday?'<span style="font-size:9px;background:var(--accent);color:#fff;padding:0 4px;border-radius:6px">today</span>':''}
-          ${isHol_?`<span style="font-size:9px;color:var(--red)">${holName(ds)}</span>`:''}
+      html+=`<div style="display:grid;grid-template-columns:52px 1fr;border-bottom:${di<6?'1px solid var(--border)':'none'};${isToday?'background:rgba(45,107,228,0.04);':''}">
+        <!-- 요일+날짜 -->
+        <div style="padding:8px 6px;border-right:1px solid var(--border);text-align:center;background:${isToday?'var(--accent-bg)':hol?'var(--red-bg)':'var(--surface2)'};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+          <div style="font-size:10px;font-weight:600;color:${isToday?'var(--accent)':numColor}">${dowKo}</div>
+          <div style="font-size:16px;font-weight:700;color:${isToday?'var(--accent)':numColor};line-height:1">${d.getDate()}</div>
+          ${hol?`<div style="font-size:8px;color:var(--red);line-height:1.2;text-align:center">${hol}</div>`:''}
         </div>
-        <textarea
-          id="hobj-${ds}"
-          placeholder="메모..."
-          style="flex:1;resize:none;border:1px solid transparent;border-radius:var(--radius-xs);padding:4px 6px;font-size:11px;font-family:var(--font);background:${memo?'var(--surface2)':'transparent'};color:var(--text);outline:none;line-height:1.5;min-height:80px;transition:all 0.1s"
-          onfocus="this.style.borderColor='var(--accent)';this.style.background='var(--bg)'"
-          onblur="this.style.borderColor='transparent';this.style.background=this.value?'var(--surface2)':'transparent';saveHaegobjMemo('${ds}',this.value)"
-          onkeydown="if(event.key==='Tab'){event.preventDefault();this.value+=String.fromCharCode(9);}"
+        <!-- 메모 -->
+        <textarea id="hobj-${ds}" placeholder="메모..."
+          style="width:100%;min-height:72px;padding:6px 8px;border:none;background:transparent;font-size:11px;font-family:var(--font);color:var(--text);outline:none;resize:none;line-height:1.6"
+          onfocus="this.style.background='var(--accent-bg)'"
+          onblur="this.style.background='transparent';saveHaegobjMemo('${ds}',this.value)"
         ></textarea>
       </div>`;
     });
+
     html+=`</div>`;
   });
 
   html+=`</div>`;
   document.getElementById('main-content').innerHTML=html;
-  // textarea 값 설정 (백틱 이스케이프 문제 방지)
-  weeks.forEach(week=>{
-    week.forEach(ds=>{
+
+  // textarea 값 설정
+  weeks.forEach(wDays=>{
+    wDays.forEach(ds=>{
       const el=document.getElementById('hobj-'+ds);
       if(el)el.value=data.haegobjMemos[ds]||'';
     });
@@ -1401,7 +1400,6 @@ function saveHaegobjMemo(ds,val){
   clearTimeout(_haegobjTimer[ds]);
   _haegobjTimer[ds]=setTimeout(async()=>{
     setSyncing();
-    // class_memos 테이블 재활용 (project_id='haegobj', week=날짜hash)
     const{error}=await sb.from('class_memos').upsert(
       {user_id:currentUser.id,project_id:`haegobj_${ds}`,week:0,content:val},
       {onConflict:'user_id,project_id,week'}
@@ -1409,6 +1407,7 @@ function saveHaegobjMemo(ds,val){
     if(error)setSyncErr('Save Error');else setSynced();
   },1000);
 }
+
 
 // ── Golf ──────────────────────────────────────────────────
 function renderGolf(){
@@ -1721,6 +1720,127 @@ async function togglePeriod(ds){
   }
 }
 async function delPeriodEntry(id){data.periodLogs=data.periodLogs.filter(p=>p.id!==id);renderPeriod();await delPeriodLog(id);}
+// ── Todo List View ───────────────────────────────────────
+function renderTodos(){
+  // cursor 기준 3일 (전날, 오늘, 내일)
+  const base=new Date(state.cursor);
+  const todS=todayStr();
+  const days=[-1,0,1].map(i=>{
+    const d=new Date(base);d.setDate(d.getDate()+i);return fmtDate(d);
+  });
+
+  // 네비게이션 헤더
+  let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+    <button onclick="navigate(-1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">‹</button>
+    <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <button onclick="navigate(1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">›</button>
+    <button onclick="toggleHideDone()" id="hide-done-btn2" class="btn-cancel" style="font-size:11px;padding:3px 10px;border-radius:12px;margin-left:auto">${_hideDone?'Show Done':'Hide Done'}</button>
+  </div>`;
+
+  // 3열 가로 레이아웃
+  html+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:start">`;
+
+  days.forEach((ds,di)=>{
+    const d=parseDate(ds);
+    const isToday=ds===todS;
+    const dow=['일','월','화','수','목','금','토'][d.getDay()];
+    const isSat=d.getDay()===6,isSun=d.getDay()===0;
+    const hol=holName(ds);
+    const numColor=hol||isSun?'var(--red)':isSat?'var(--accent)':'var(--text)';
+
+    // 이날 독립 tasks + proj event 세부항목
+    const dayPevs=data.projEvents.filter(e=>e.date===ds);
+    const dayTasks=data.tasks.filter(t=>t.date===ds&&!t.eventId&&(!_hideDone||!t.done));
+
+    html+=`<div class="card" style="overflow:hidden${isToday?';outline:2px solid var(--accent);outline-offset:-2px':''}">
+      <!-- 날짜 헤더 -->
+      <div style="padding:10px 14px;border-bottom:1px solid var(--border);background:${isToday?'var(--accent-bg)':'var(--surface2)'};display:flex;align-items:center;gap:8px">
+        <div>
+          <div style="font-size:20px;font-weight:700;color:${isToday?'var(--accent)':numColor};line-height:1">${d.getDate()}</div>
+          <div style="font-size:11px;color:${isToday?'var(--accent-txt)':numColor};font-weight:500">${d.getMonth()+1}월 ${dow}${hol?` · ${hol}`:''}</div>
+        </div>
+        ${isToday?'<span style="font-size:10px;background:var(--accent);color:#fff;padding:2px 8px;border-radius:8px;margin-left:4px">오늘</span>':''}
+        <button onclick="openAddTaskModal('${ds}')" style="margin-left:auto;background:none;border:1px solid var(--border2);border-radius:var(--radius-xs);padding:3px 10px;cursor:pointer;font-size:13px;color:var(--text3)">+</button>
+      </div>
+      <!-- 내용 -->
+      <div style="min-height:200px">`;
+
+    // proj event 세부항목 그룹
+    dayPevs.forEach(ev=>{
+      const subs=data.tasks.filter(t=>t.eventId===ev.id&&(!_hideDone||!t.done));
+      if(subs.length===0&&_hideDone)return;
+      const p=proj(ev.projectId),c=p.color||'#4472C4';
+      html+=`<div style="border-bottom:1px solid var(--border)">
+        <div style="padding:6px 14px;background:${evBg(c)};font-size:11px;font-weight:600;color:${evTxt(c)};cursor:pointer;display:flex;align-items:center;gap:5px" onclick="openEditItem('proj','${ev.id}')">
+          <span style="width:5px;height:5px;border-radius:50%;background:${c};display:inline-block"></span>${escH(ev.title)}
+        </div>`;
+      subs.forEach(td=>{
+        html+=`<div class="todo-item" style="padding-left:20px;border-bottom:1px solid var(--border)">
+          <input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked)">
+          <span class="todo-txt${td.done?' done':''}" style="flex:1;font-size:12px">${escH(td.title)}</span>
+          <input type="date" value="${td.date||ds}" title="날짜 변경"
+            style="width:90px;padding:1px 3px;border:1px solid var(--border2);border-radius:3px;font-size:10px;background:var(--bg);color:var(--text);outline:none"
+            onchange="changeSubDate('${td.id}',this.value)">
+          <button class="todo-del" onclick="deleteTask('${td.id}')">✕</button>
+        </div>`;
+      });
+      html+=`<div style="padding:3px 14px 5px 20px">
+        <input type="text" placeholder="+ 세부항목 추가..." style="width:100%;border:none;border-bottom:1px dashed var(--border2);font-size:11px;background:transparent;outline:none;font-family:var(--font);color:var(--text2);padding:2px 0"
+          onkeydown="if(event.key==='Enter')addLinkedTask('${ev.id}','${ds}','${ev.projectId||''}',this)">
+      </div></div>`;
+    });
+
+    // 독립 tasks
+    dayTasks.forEach(td=>{
+      const p=proj(td.projectId),c=p.color||'#999';
+      const subs=data.tasks.filter(s=>s.eventId===td.id);
+      html+=`<div class="todo-item" style="border-bottom:1px solid var(--border)">
+        <input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked)">
+        <div style="flex:1;min-width:0">
+          <div class="todo-txt${td.done?' done':''}">${escH(td.title)}</div>
+          ${p.name?`<div style="font-size:10px;color:${c}">${p.name}</div>`:''}
+          ${subs.length>0?`<div style="font-size:10px;color:var(--text3)">${subs.filter(s=>s.done).length}/${subs.length} subtasks</div>`:''}
+        </div>
+        <button class="todo-del" onclick="deleteTask('${td.id}')">✕</button>
+      </div>`;
+    });
+
+    if(dayPevs.length===0&&dayTasks.length===0){
+      html+=`<div style="padding:24px 14px;text-align:center;font-size:12px;color:var(--text3)">No tasks</div>`;
+    }
+
+    // 빠른 추가
+    html+=`</div>
+      <div style="padding:8px;border-top:1px solid var(--border);background:var(--surface)">
+        <div style="display:flex;gap:5px;margin-bottom:5px">
+          <input type="text" id="td-inp-${ds}" placeholder="Add task..."
+            style="flex:1;padding:5px 8px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font)"
+            onkeydown="if(event.key==='Enter')addTodosViewTask('${ds}',this)">
+          <button onclick="addTodosViewTask('${ds}',document.getElementById('td-inp-${ds}'))"
+            style="padding:5px 10px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-xs);cursor:pointer;font-size:14px">+</button>
+        </div>
+        <select id="td-proj-${ds}" style="width:100%;padding:3px 6px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:11px;background:var(--bg);color:var(--text);outline:none">
+          <option value="">No project</option>
+          ${data.projects.map(pr=>`<option value="${pr.id}">${escH(pr.name)}</option>`).join('')}
+        </select>
+      </div>
+    </div>`;
+  });
+
+  html+=`</div>`;
+  document.getElementById('main-content').innerHTML=html;
+}
+
+async function addTodosViewTask(ds,inp){
+  const title=inp.value.trim();if(!title)return;
+  const sel=document.getElementById(`td-proj-${ds}`);
+  const pid=sel?sel.value:'';
+  const td={id:makeId(),title,date:ds,projectId:pid,done:false,eventId:''};
+  data.tasks.push(td);inp.value='';
+  renderTodos();renderAll();
+  await saveTask(td);
+}
+
 // ── Task Calendar ────────────────────────────────────────
 function renderTaskCal(){
   const yr=state.cursor.getFullYear(),mo=state.cursor.getMonth();
@@ -2165,16 +2285,20 @@ function todoPanelToday(){
   renderTodoPanel();
 }
 function toggleTodos(){
-  const p=document.getElementById('todo-panel');
-  if(p.style.display==='none'||!p.style.display){
-    state.todoPanelDate=todayStr();
-    renderTodoPanel();
-    p.style.display='flex';
-    pushUiState('todo-panel');
-  }else p.style.display='none';
+  // 이제 뷰로 전환
+  setView('todos');
 }
 function closeTodoPanel(){document.getElementById('todo-panel').style.display='none';}
-function toggleHideDone(){_hideDone=!_hideDone;document.getElementById('hide-done-btn').textContent=_hideDone?'Show Done':'Hide Done';renderTodoPanel();}
+function toggleHideDone(){
+  _hideDone=!_hideDone;
+  const label=_hideDone?'Show Done':'Hide Done';
+  const btn1=document.getElementById('hide-done-btn');
+  const btn2=document.getElementById('hide-done-btn2');
+  if(btn1)btn1.textContent=label;
+  if(btn2)btn2.textContent=label;
+  if(state.view==='todos')renderTodos();
+  else renderTodoPanel();
+}
 function renderTodoPanel(){
   const baseDate=parseDate(state.todoPanelDate);
   // 3일치 날짜 생성
