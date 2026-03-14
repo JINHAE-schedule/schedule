@@ -685,18 +685,22 @@ let currentUser = null;
 // ── Constants ──────────────────────────────────────────────
 const DOW_KO = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const MONTHS_KO = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-const PALETTE = ['#4472C4','#ED7D31','#A9D18E','#FF0000','#FFC000','#5B9BD5','#70AD47','#7030A0','#C00000','#00B0F0','#92D050','#FF7C80','#FFD966','#9DC3E6','#A9D18E','#FF9999'];
+const PALETTE = ['#4472C4','#ED7D31','#A9D18E','#FF0000','#FFC000','#5B9BD5','#70AD47','#7030A0','#C00000','#00B0F0','#92D050','#FF7C80','#FFD966','#9DC3E6','#A9D18E','#FF9999','#F2F2F2','#E6E6E6','#D9D9D9','#BFBFBF','#A6A6A6','#808080','#595959','#404040','#262626'];
 const BG = {
   '#4472C4':'#EEF3FB','#ED7D31':'#FEF0E7','#A9D18E':'#F2FAF0','#FF0000':'#FFF0F0',
   '#FFC000':'#FFFBE6','#5B9BD5':'#EBF4FB','#70AD47':'#F0F7EB','#7030A0':'#F5EEF8',
   '#C00000':'#FAEAEA','#00B0F0':'#E6F7FF','#92D050':'#F4FBEA','#FF7C80':'#FFF0F0',
-  '#FFD966':'#FFFBE6','#9DC3E6':'#EEF6FB','#A9D18E':'#F2FAF0','#FF9999':'#FFF0F0'
+  '#FFD966':'#FFFBE6','#9DC3E6':'#EEF6FB','#FF9999':'#FFF0F0',
+  '#F2F2F2':'#FAFAFA','#E6E6E6':'#F5F5F5','#D9D9D9':'#F0F0F0','#BFBFBF':'#EBEBEB',
+  '#A6A6A6':'#E8E8E8','#808080':'#E0E0E0','#595959':'#D8D8D8','#404040':'#D0D0D0','#262626':'#C8C8C8'
 };
 const TXT = {
   '#4472C4':'#1F3864','#ED7D31':'#843C0C','#A9D18E':'#375623','#FF0000':'#C00000',
   '#FFC000':'#7F6000','#5B9BD5':'#1F497D','#70AD47':'#375623','#7030A0':'#3D1B52',
   '#C00000':'#7B0000','#00B0F0':'#006699','#92D050':'#3D6B00','#FF7C80':'#C00000',
-  '#FFD966':'#7F6000','#9DC3E6':'#1F497D','#FF9999':'#C00000'
+  '#FFD966':'#7F6000','#9DC3E6':'#1F497D','#FF9999':'#C00000',
+  '#F2F2F2':'#404040','#E6E6E6':'#404040','#D9D9D9':'#404040','#BFBFBF':'#262626',
+  '#A6A6A6':'#262626','#808080':'#F2F2F2','#595959':'#F2F2F2','#404040':'#F2F2F2','#262626':'#F2F2F2'
 };
 function evBg(c){return BG[c]||'#EEF3FC';} function evTxt(c){return TXT[c]||'#1A4BA8';}
 
@@ -1651,7 +1655,7 @@ function renderMonth(){
     let numColor=holiday?'color:var(--red);':dowIdx===5?'color:var(--accent);':dowIdx===6?'color:var(--red);':'';
     let cellBg=(!cell.other&&data.cellColors&&data.cellColors[ds])?data.cellColors[ds]:'';
     let bgStyle=cellBg?`background:${cellBg}1A;`:'';
-    html+=`<div class="month-cell${cell.other?' other':''}${isToday?' today':''}${isSel?' selected':''}" style="${bgStyle}" onclick="selectDay('${ds}');${!cell.other?`openAddModal('${ds}','09:00')`:''}">`;
+    html+=`<div class="month-cell${cell.other?' other':''}${isToday?' today':''}${isSel?' selected':''}" style="${bgStyle}" onclick="selectDay('${ds}');${!cell.other?`openAddModal('${ds}','09:00')`:''}" oncontextmenu="event.preventDefault();${!cell.other?`openCellColorPicker('${ds}',event)`:''}">`;
     let labelsHtml='';
     if(!cell.other){
       if(holiday) labelsHtml+=`<span style="font-size:9px;color:var(--red);font-weight:500;margin-left:3px;">${holiday}</span>`;
