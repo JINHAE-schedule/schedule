@@ -409,14 +409,14 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: va
 
   <div class="nav-section">
     <div class="nav-label">Timed Events
-      <button class="nav-label-btn" onclick="openTimedEventModal()" title="추가">+</button>
+      <button class="nav-label-btn" onclick="openTimedCatModal()" title="카테고리 관리">+</button>
     </div>
     <button class="proj-nav-btn" id="te-all-btn" onclick="setTimedFilter(null)">
       <span class="proj-dot" style="background:var(--text3);"></span>
       <span>All</span>
       <span class="proj-count" id="te-all-count">0</span>
     </button>
-    <div id="te-proj-list"></div>
+    <div id="te-cat-list"></div>
   </div>
 
   <div class="nav-section">
@@ -497,6 +497,24 @@ body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); color: va
     <button class="btn-cancel" onclick="closeTimedModal()">취소</button>
     <button class="btn-save" onclick="saveTimedEvent()">저장</button>
   </div>
+</div>
+</div>
+
+<!-- Timed Category Modal -->
+<div class="modal-overlay" id="timed-cat-modal" style="display:none;" onclick="if(event.target.id==='timed-cat-modal')closeTimedCatModal()">
+<div class="modal" style="width:400px;">
+  <div class="modal-title">⏰ Timed Events 카테고리</div>
+  <div id="timed-cat-list" style="max-height:240px;overflow-y:auto;margin-bottom:14px;"></div>
+  <div style="padding:12px;background:var(--surface2);border-radius:var(--radius-sm);">
+    <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:8px;">새 카테고리 추가</div>
+    <div style="display:flex;gap:6px;margin-bottom:8px;">
+      <input type="text" id="tc-emoji" placeholder="💊" maxlength="2" style="width:38px;padding:6px 4px;border:1px solid var(--border2);border-radius:var(--radius-sm);font-size:16px;text-align:center;background:var(--bg);outline:none;">
+      <input type="text" id="tc-name" placeholder="이름 (예: 병원, 미용)" style="flex:1;padding:6px 8px;border:1px solid var(--border2);border-radius:var(--radius-sm);font-size:13px;background:var(--bg);outline:none;">
+    </div>
+    <div id="tc-color-pick" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;"></div>
+    <button onclick="addTimedCategory()" style="width:100%;padding:8px;background:var(--accent);color:white;border:none;border-radius:var(--radius-sm);font-size:13px;cursor:pointer;">추가</button>
+  </div>
+  <div class="modal-footer"><button class="btn-cancel" onclick="closeTimedCatModal()">닫기</button></div>
 </div>
 </div>
 
@@ -744,7 +762,7 @@ function getDayLabels(ds){
 }
 
 // ── Local Data (in-memory, synced from Supabase) ───────────
-let data = { projects:[], events:[], todos:[], golf:{}, office:{}, cellColors:{}, projectMemos:{}, anniversaries:[], timedEvents:[] };
+let data = { projects:[], events:[], todos:[], golf:{}, office:{}, cellColors:{}, projectMemos:{}, anniversaries:[], timedEvents:[], timedCategories:[] };
 
 // ── Auth ───────────────────────────────────────────────────
 async function signInWithGoogle() {
@@ -804,26 +822,77 @@ function closeSidebar(){
 // ── Utilities ─────────────────────────────────────────────
 function makeId(){ return 'id-'+Date.now()+'-'+Math.random().toString(36).slice(2,7); }
 
+// ── Timed Categories ──────────────────────────────────────
+let newTcColor = '#4472C4';
+function openTimedCatModal(){
+  renderTimedCatList();
+  // 색상 팔레트
+  let cHtml='';
+  PALETTE.forEach(c=>{cHtml+=`<div class="color-swatch${c===newTcColor?' selected':''}" style="background:${c};" onclick="newTcColor='${c}';openTimedCatModal()"></div>`;});
+  document.getElementById('tc-color-pick').innerHTML=cHtml;
+  document.getElementById('timed-cat-modal').style.display='flex';
+}
+function closeTimedCatModal(){ document.getElementById('timed-cat-modal').style.display='none'; }
+function renderTimedCatList(){
+  let html='';
+  if(data.timedCategories.length===0){
+    html='<div style="font-size:12px;color:var(--text3);text-align:center;padding:16px;">카테고리 없음</div>';
+  } else {
+    data.timedCategories.forEach(c=>{
+      let cnt=data.timedEvents.filter(t=>t.categoryId===c.id).length;
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);">
+        <span style="width:10px;height:10px;border-radius:50%;background:${c.color};display:inline-block;flex-shrink:0;"></span>
+        <span style="font-size:16px;">${c.emoji||''}</span>
+        <span style="flex:1;font-size:13px;">${c.name}</span>
+        <span style="font-size:11px;color:var(--text3);">${cnt}개</span>
+        <button onclick="deleteTimedCategory('${c.id}')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;">✕</button>
+      </div>`;
+    });
+  }
+  document.getElementById('timed-cat-list').innerHTML=html;
+}
+async function addTimedCategory(){
+  if(!currentUser) return;
+  let emoji=document.getElementById('tc-emoji').value.trim();
+  let name=document.getElementById('tc-name').value.trim();
+  if(!name){alert('이름을 입력해주세요.');return;}
+  let c={id:makeId(),name,color:newTcColor,emoji};
+  data.timedCategories.push(c);
+  renderTimedCatList();renderAll();
+  document.getElementById('tc-name').value='';
+  document.getElementById('tc-emoji').value='';
+  await sb.from('timed_categories').insert({id:c.id,user_id:currentUser.id,name,color:newTcColor,emoji});
+}
+async function deleteTimedCategory(id){
+  data.timedCategories=data.timedCategories.filter(c=>c.id!==id);
+  renderTimedCatList();renderAll();
+  await sb.from('timed_categories').delete().eq('id',id).eq('user_id',currentUser.id);
+}
+
 // ── Timed Events ───────────────────────────────────────────
 let _editingTimedId = null;
 
 function openTimedEventModal(id){
   _editingTimedId = id||null;
   let te = id ? data.timedEvents.find(t=>t.id===id) : null;
-  // 프로젝트 셀렉트 채우기
+  // 카테고리 셀렉트 채우기
   let sel = document.getElementById('te-project');
-  sel.innerHTML = data.projects.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+  if(data.timedCategories.length===0){
+    sel.innerHTML='<option value="">카테고리 없음 (+ 로 추가)</option>';
+  } else {
+    sel.innerHTML = data.timedCategories.map(c=>`<option value="${c.id}">${c.emoji?c.emoji+' ':''}${c.name}</option>`).join('');
+  }
   if(te){
     document.getElementById('te-title').value = te.title;
     document.getElementById('te-date').value = te.date;
     document.getElementById('te-time').value = te.time;
-    sel.value = te.projectId;
+    sel.value = te.categoryId||'';
     document.getElementById('te-del-btn').style.display = '';
   } else {
     document.getElementById('te-title').value = '';
     document.getElementById('te-date').value = fmtDate(state.cursor);
     document.getElementById('te-time').value = '09:00';
-    sel.value = data.projects[0]?.id||'';
+    sel.value = data.timedCategories[0]?.id||'';
     document.getElementById('te-del-btn').style.display = 'none';
   }
   document.getElementById('timed-modal').style.display = 'flex';
@@ -834,18 +903,18 @@ async function saveTimedEvent(){
   let title = document.getElementById('te-title').value.trim();
   let date  = document.getElementById('te-date').value;
   let time  = document.getElementById('te-time').value;
-  let pid   = document.getElementById('te-project').value;
+  let catId = document.getElementById('te-project').value;
   if(!title||!date||!time){ alert('제목, 날짜, 시간을 입력해주세요.'); return; }
   if(_editingTimedId){
     let te = data.timedEvents.find(t=>t.id===_editingTimedId);
-    if(te){ te.title=title; te.date=date; te.time=time; te.projectId=pid; }
+    if(te){ te.title=title; te.date=date; te.time=time; te.categoryId=catId; }
     closeTimedModal(); renderAll();
-    await sb.from('timed_events').update({title,date,time,project_id:pid}).eq('id',_editingTimedId).eq('user_id',currentUser.id);
+    await sb.from('timed_events').update({title,date,time,category_id:catId}).eq('id',_editingTimedId).eq('user_id',currentUser.id);
   } else {
-    let te = {id:makeId(), title, date, time, projectId:pid};
+    let te = {id:makeId(), title, date, time, categoryId:catId};
     data.timedEvents.push(te);
     closeTimedModal(); renderAll();
-    await sb.from('timed_events').insert({id:te.id, user_id:currentUser.id, title, date, time, project_id:pid});
+    await sb.from('timed_events').insert({id:te.id, user_id:currentUser.id, title, date, time, category_id:catId});
   }
 }
 async function deleteTimedEvent(){
@@ -856,9 +925,10 @@ async function deleteTimedEvent(){
 }
 function timedEventsOn(ds){
   let tes=data.timedEvents.filter(t=>t.date===ds);
-  if(state.filterTimedProj) tes=tes.filter(t=>t.projectId===state.filterTimedProj);
+  if(state.filterTimedProj) tes=tes.filter(t=>t.categoryId===state.filterTimedProj);
   return tes.sort((a,b)=>a.time.localeCompare(b.time));
 }
+function timedCat(id){ return data.timedCategories.find(c=>c.id===id)||{name:'',color:'#4472C4',emoji:''}; }
 function setTimedFilter(pid){
   state.filterTimedProj=pid;
   if(window.innerWidth<=768) closeSidebar();
@@ -1018,7 +1088,7 @@ async function loadAllData() {
   setSyncing();
   try {
     const uid = currentUser.id;
-    const [evRes, tdRes, prRes, gRes, oRes, ccRes, pmRes, anRes, teRes] = await Promise.all([
+    const [evRes, tdRes, prRes, gRes, oRes, ccRes, pmRes, anRes, teRes, tcRes] = await Promise.all([
       sb.from('events').select('*').eq('user_id', uid),
       sb.from('todos').select('*').eq('user_id', uid),
       sb.from('projects').select('*').eq('user_id', uid),
@@ -1028,6 +1098,7 @@ async function loadAllData() {
       sb.from('project_memos').select('*').eq('user_id', uid),
       sb.from('anniversaries').select('*').eq('user_id', uid),
       sb.from('timed_events').select('*').eq('user_id', uid),
+      sb.from('timed_categories').select('*').eq('user_id', uid),
     ]);
 
     // Projects
@@ -1085,7 +1156,12 @@ async function loadAllData() {
     // Timed Events
     data.timedEvents = (teRes.data || []).map(t => ({
       id: t.id, title: t.title, date: t.date,
-      time: t.time, projectId: t.project_id
+      time: t.time, categoryId: t.category_id
+    }));
+
+    // Timed Categories
+    data.timedCategories = (tcRes.data || []).map(c => ({
+      id: c.id, name: c.name, color: c.color||'#4472C4', emoji: c.emoji||''
     }));
 
     setSynced();
@@ -1286,23 +1362,21 @@ function renderSidebar(){
   });
   document.getElementById('proj-nav-list').innerHTML=html;
 
-  // Timed Events 프로젝트별 목록
+  // Timed Events 카테고리 목록
   let teAllBtn=document.getElementById('te-all-btn');
   if(teAllBtn){
     teAllBtn.className='proj-nav-btn'+(state.filterTimedProj===null?' active':'');
     document.getElementById('te-all-count').textContent=data.timedEvents.length;
     let teHtml='';
-    // 프로젝트 중 timed event 있는 것만
-    data.projects.forEach(p=>{
-      let cnt=data.timedEvents.filter(t=>t.projectId===p.id).length;
-      if(cnt===0) return;
-      teHtml+=`<button class="proj-nav-btn${state.filterTimedProj===p.id?' active':''}" onclick="setTimedFilter('${p.id}')">
-        <span class="proj-dot" style="background:${p.color};"></span>
-        <span>${p.name}</span>
+    data.timedCategories.forEach(c=>{
+      let cnt=data.timedEvents.filter(t=>t.categoryId===c.id).length;
+      teHtml+=`<button class="proj-nav-btn${state.filterTimedProj===c.id?' active':''}" onclick="setTimedFilter('${c.id}')">
+        <span class="proj-dot" style="background:${c.color};"></span>
+        <span>${c.emoji?c.emoji+' ':''}${c.name}</span>
         <span class="proj-count">${cnt}</span>
       </button>`;
     });
-    document.getElementById('te-proj-list').innerHTML=teHtml;
+    document.getElementById('te-cat-list').innerHTML=teHtml;
   }
 }
 
@@ -1348,9 +1422,9 @@ function renderDay(){
   if(tes.length>0){
     html+=`<div style="padding:6px 12px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px;">`;
     tes.forEach(te=>{
-      let p=proj(te.projectId);let c=p.color||'var(--accent)';
+      let cat=timedCat(te.categoryId);let c=cat.color||'#4472C4';
       html+=`<div style="background:${evBg(c)};color:${evTxt(c)};border-radius:12px;padding:3px 10px;font-size:12px;cursor:pointer;display:flex;gap:4px;align-items:center;" onclick="openTimedEventModal('${te.id}')">
-        <span style="font-weight:600;">${te.time}</span><span>${te.title}</span>
+        <span style="font-weight:600;">${te.time}</span><span>${cat.emoji?cat.emoji+' ':''}</span><span>${te.title}</span>
       </div>`;
     });
     html+=`</div>`;
@@ -1586,7 +1660,7 @@ function renderMonth(){
     html+=`<div class="month-cell-num" style="display:flex;align-items:baseline;flex-wrap:wrap;gap:1px;${numColor}${cellBg&&!cell.other?`color:${cellBg};font-weight:700;`:''}"><span>${cell.date.getDate()}</span>${cellBg&&!cell.other?`<span class="cell-color-dot" style="background:${cellBg};"></span>`:''}${labelsHtml}</div>`;
     // Timed Events - 시간+제목 표시
     timedEventsOn(ds).forEach(te=>{
-      let p=proj(te.projectId);let c=p.color||'var(--accent)';
+      let cat=timedCat(te.categoryId);let c=cat.color||'#4472C4';
       html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)};display:flex;gap:3px;" onclick="event.stopPropagation();openTimedEventModal('${te.id}')"><span style="opacity:0.75;font-size:9px;">${te.time}</span>${te.title}</div>`;
     });
     evs.forEach(ev=>{
