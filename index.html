@@ -328,6 +328,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
       <div class="nav-sec">
         <div class="nav-lbl">Records</div>
         <button class="nav-btn" data-view="period" onclick="setView('period')"><span class="nav-icon" style="color:var(--pink)">🌸</span>Period</button>
+        <button class="nav-btn" data-view="travel" onclick="setView('travel')"><span class="nav-icon" style="color:#0891B2">✈️</span>Travel</button>
       </div>
       <div style="padding:4px 10px;display:flex;gap:6px;flex-wrap:wrap">
   <button onclick="exportData()" class="nav-btn" style="font-size:10px;padding:3px 8px">⬇ Backup</button>
@@ -517,6 +518,31 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
     <button class="btn-cancel" onclick="closeStudioModal()">Cancel</button>
     <button class="btn-save" onclick="studioModalSave()">Save</button>
   </div>
+
+<!-- Travel Modal -->
+<div class="modal-overlay" id="travel-modal" style="display:none" onclick="if(event.target.id==='travel-modal')closeTravelModal()">
+<div class="modal" style="width:420px">
+  <div class="modal-title" id="travel-modal-title">✈️ Add Travel</div>
+  <input type="hidden" id="travel-modal-id">
+  <div class="form-row"><label>여행 이름</label><input type="text" id="travel-name" placeholder="예: 도쿄 여행"></div>
+  <div class="form-row"><label>목적지</label><input type="text" id="travel-dest" placeholder="예: Japan, Tokyo"></div>
+  <div class="form-grid2">
+    <div class="form-row"><label>시작일</label><input type="date" id="travel-start"></div>
+    <div class="form-row"><label>종료일</label><input type="date" id="travel-end"></div>
+  </div>
+  <div class="form-row">
+    <label>색상</label>
+    <div class="color-row" id="travel-colors"></div>
+  </div>
+  <div class="form-row"><label>메모</label><textarea id="travel-memo" placeholder="메모..."></textarea></div>
+  <div class="modal-footer">
+    <button class="btn-del" id="travel-del-btn" style="display:none" onclick="deleteTravel()">Delete</button>
+    <button class="btn-cancel" onclick="closeTravelModal()">Cancel</button>
+    <button class="btn-save" onclick="saveTravel()">Save</button>
+  </div>
+</div>
+</div>
+
 </div>
 </div>
 
@@ -548,7 +574,7 @@ let data={
   projects:[],timedEvents:[],timedCats:[],
   projEvents:[],tasks:[],
   golf:{},office:{},cellColors:{},
-  anniversaries:[],periodLogs:[],
+  anniversaries:[],periodLogs:[],travels:[],
   homeNote:'',classMemos:{},
   projOrder:[]
 };
@@ -640,6 +666,7 @@ async function showApp(user){
   initTheme();
   setupHistory();
   await loadAll();
+  loadTravelsLocal();
 }
 
 // ── Load All ──────────────────────────────────────────────
@@ -766,7 +793,7 @@ function navigate(dir){
   const c=state.cursor;
   if(['day'].includes(state.view))c.setDate(c.getDate()+dir);
   else if(['month','studio','golf','period'].includes(state.view))c.setMonth(c.getMonth()+dir);
-  else if(state.view==='year')c.setFullYear(c.getFullYear()+dir);
+  else if(['year','travel'].includes(state.view))c.setFullYear(c.getFullYear()+dir);
   state.cursor=new Date(c);renderAll();
 }
 function goToday(){state.cursor=new Date(today);state.selected=todayStr();renderAll();}
@@ -775,7 +802,7 @@ function jumpToDay(ds){state.selected=ds;state.cursor=parseDate(ds);setView('day
 function setProjFilter(pid){
   state.projFilter=pid;
   if(pid)state.timedFilter=null; // 동시 필터 방지
-  if(pid&&['golf','studio','period','day'].includes(state.view)){
+  if(pid&&['golf','studio','period','day','travel'].includes(state.view)){
     state.view='month';
     document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='month'));
   }
@@ -785,7 +812,7 @@ function setProjFilter(pid){
 function setTimedFilter(id){
   state.timedFilter=id;
   if(id)state.projFilter=null; // 동시 필터 방지
-  if(id&&['golf','studio','period','day'].includes(state.view)){
+  if(id&&['golf','studio','period','day','travel'].includes(state.view)){
     state.view='month';
     document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='month'));
   }
@@ -794,19 +821,25 @@ function setTimedFilter(id){
 }
 
 // ── Sidebar ───────────────────────────────────────────────
-function toggleSb(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('sb-overlay').classList.toggle('open');}
+function toggleSb(){
+  const sb=document.getElementById('sidebar');
+  const opening=!sb.classList.contains('open');
+  sb.classList.toggle('open');
+  document.getElementById('sb-overlay').classList.toggle('open');
+  if(opening&&window.innerWidth<=768)pushUiState('sidebar');
+}
 function closeSb(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sb-overlay').classList.remove('open');}
 
 // ── Render All ────────────────────────────────────────────
 function renderAll(){
   if(!currentUser)return;
   updateTitle();renderSidebar();renderFilterBar();
-  const views={home:renderHome,year:renderYear,month:renderMonth,day:renderDay,golf:renderGolf,studio:renderStudio,period:renderPeriod};
+  const views={home:renderHome,year:renderYear,month:renderMonth,day:renderDay,golf:renderGolf,studio:renderStudio,period:renderPeriod,travel:renderTravel};
   (views[state.view]||renderHome)();
 }
 function updateTitle(){
   const c=state.cursor;
-  const titles={home:'🏠 Home',year:c.getFullYear()+'년',month:c.getFullYear()+'년 '+(c.getMonth()+1)+'월',day:c.getFullYear()+'년 '+(c.getMonth()+1)+'월 '+c.getDate()+'일 ('+['일','월','화','수','목','금','토'][c.getDay()]+')',golf:'⛳ Golf — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',studio:'🏢 Studio — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',period:'🌸 Period — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월'};
+  const titles={home:'🏠 Home',year:c.getFullYear()+'년',travel:'✈️ Travel — '+c.getFullYear()+'년',month:c.getFullYear()+'년 '+(c.getMonth()+1)+'월',day:c.getFullYear()+'년 '+(c.getMonth()+1)+'월 '+c.getDate()+'일 ('+['일','월','화','수','목','금','토'][c.getDay()]+')',golf:'⛳ Golf — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',studio:'🏢 Studio — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',period:'🌸 Period — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월'};
   document.getElementById('main-title').textContent=titles[state.view]||'';
 }
 function renderSidebar(){
@@ -963,10 +996,12 @@ function renderMonth(){
   // If timed filter active, show timed events list below
   if(state.timedFilter){
     const cat=timedCat(state.timedFilter);
-    const tes=data.timedEvents.filter(t=>t.categoryId===state.timedFilter).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+    const yr=state.cursor.getFullYear();
+    const tes=data.timedEvents.filter(t=>t.categoryId===state.timedFilter&&t.date.startsWith(yr+'')).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
     html+=`<div class="card" style="margin-top:14px;overflow:hidden">
       <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px">
-        <span style="width:10px;height:10px;border-radius:50%;background:${cat.color};display:inline-block"></span>${cat.emoji?cat.emoji+' ':''}${escH(cat.name)} 일정
+        <span style="width:10px;height:10px;border-radius:50%;background:${cat.color};display:inline-block"></span>${cat.emoji?cat.emoji+' ':''}${escH(cat.name)} ${yr}년 일정
+        <span style="font-size:11px;color:var(--text3);font-weight:400;margin-left:auto">${tes.length}개</span>
       </div>`;
     if(tes.length===0)html+=`<div class="empty">No events</div>`;
     else tes.forEach(te=>{
@@ -992,10 +1027,10 @@ function renderMonth(){
   if(state.projFilter){
     const p=proj(state.projFilter);
     const evs=data.projEvents.filter(e=>e.projectId===state.projFilter).sort((a,b)=>a.date.localeCompare(b.date));
-    const isClass=['패션디자인연구(4)','회화론','디자인미학'].some(n=>p.name.includes(n));
     html+=`<div class="card" style="margin-top:14px;overflow:hidden">
       <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px">
-        <span style="width:10px;height:10px;border-radius:50%;background:${p.color};display:inline-block"></span>${escH(p.name)} 일정
+        <span style="width:10px;height:10px;border-radius:50%;background:${p.color};display:inline-block"></span>${escH(p.name)} 전체 일정
+        <span style="font-size:11px;color:var(--text3);font-weight:400;margin-left:auto">${evs.length}개</span>
       </div>`;
     if(evs.length===0)html+=`<div class="empty">No events</div>`;
     else evs.forEach(ev=>{
@@ -1231,7 +1266,49 @@ function renderGolf(){
       <div style="font-size:11px;color:var(--text3);margin-bottom:3px">합계</div>
       <div style="font-size:20px;font-weight:700;color:#BA7517">${(totalBase+totalOver).toLocaleString()}원</div>
     </div>
-  </div></div></div>`;
+  </div></div>`;
+
+  // 연간 월별 통계
+  const statYr=state.cursor.getFullYear();
+  let yearHtml=`<div class="card" style="margin-top:12px;padding:14px">
+    <div style="font-size:12px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+      <span style="width:8px;height:8px;border-radius:50%;background:#BA7517;display:inline-block"></span>${statYr}년 월별 현황
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <tr style="border-bottom:2px solid var(--border)">
+        <th style="padding:4px 6px;text-align:left;color:var(--text3);font-weight:600">월</th>
+        <th style="padding:4px 6px;text-align:right;color:var(--text3);font-weight:600">라운드</th>
+        <th style="padding:4px 6px;text-align:right;color:var(--text3);font-weight:600">캐디피</th>
+        <th style="padding:4px 6px;text-align:right;color:#0891B2;font-weight:600">오버피</th>
+        <th style="padding:4px 6px;text-align:right;color:#BA7517;font-weight:600">합계</th>
+      </tr>`;
+  let ytBase=0,ytOver=0,ytRounds=0;
+  for(let m=0;m<12;m++){
+    const lastD=new Date(statYr,m+1,0);
+    let mBase=0,mOver=0,mRounds=0;
+    for(let d=1;d<=lastD.getDate();d++){
+      const ds=ym(statYr,m,d),g=data.golf[ds];
+      const rounds=g&&Array.isArray(g.rounds)?g.rounds:[];
+      rounds.forEach(r=>{if(Number(r.amount)>0){mBase+=Number(r.amount)||0;mOver+=Number(r.overFee)||0;mRounds++;}});
+    }
+    ytBase+=mBase;ytOver+=mOver;ytRounds+=mRounds;
+    if(mRounds===0)continue;
+    yearHtml+=`<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:4px 6px;font-weight:500">${m+1}월</td>
+      <td style="padding:4px 6px;text-align:right">${mRounds}회</td>
+      <td style="padding:4px 6px;text-align:right">${mBase.toLocaleString()}</td>
+      <td style="padding:4px 6px;text-align:right;color:#0891B2">${mOver>0?'+'+mOver.toLocaleString():'-'}</td>
+      <td style="padding:4px 6px;text-align:right;font-weight:600;color:#BA7517">${(mBase+mOver).toLocaleString()}</td>
+    </tr>`;
+  }
+  yearHtml+=`<tr style="background:var(--surface2);font-weight:700">
+    <td style="padding:5px 6px">합계</td>
+    <td style="padding:5px 6px;text-align:right">${ytRounds}회</td>
+    <td style="padding:5px 6px;text-align:right">${ytBase.toLocaleString()}</td>
+    <td style="padding:5px 6px;text-align:right;color:#0891B2">${ytOver>0?'+'+ytOver.toLocaleString():'-'}</td>
+    <td style="padding:5px 6px;text-align:right;color:#BA7517">${(ytBase+ytOver).toLocaleString()}</td>
+  </tr></table></div>`;
+  html+=`</div>`+yearHtml;
   document.getElementById('main-content').innerHTML=html;
 }
 function openGolfModal(ds){
@@ -1245,6 +1322,7 @@ function openGolfModal(ds){
   document.querySelectorAll('.golf-wx-btn').forEach(b=>b.classList.toggle('active',b.textContent===window._gWx));
   renderGolfRounds();
   document.getElementById('golf-modal').style.display='flex';
+  pushUiState('golf-modal');
 }
 function renderGolfRounds(){
   const rounds=window._gRounds;
@@ -1365,6 +1443,7 @@ function openStudioModal(ds){
   document.getElementById('studio-out').value=rec.out||'';
   document.getElementById('studio-del-btn').style.display=rec.in||rec.out?'':'none';
   document.getElementById('studio-modal').style.display='flex';
+  pushUiState('studio-modal');
 }
 function closeStudioModal(){document.getElementById('studio-modal').style.display='none';}
 async function studioModalSave(){
@@ -1450,6 +1529,127 @@ async function togglePeriod(ds){
   }
 }
 async function delPeriodEntry(id){data.periodLogs=data.periodLogs.filter(p=>p.id!==id);renderPeriod();await delPeriodLog(id);}
+// ── Travel ────────────────────────────────────────────────
+let _travelColor=PALETTE[0];
+let _editTravelId=null;
+
+function renderTravel(){
+  const yr=state.cursor.getFullYear();
+  const yearTravels=data.travels.filter(t=>{
+    const sy=parseInt(t.startDate.slice(0,4)),ey=parseInt(t.endDate.slice(0,4));
+    return sy<=yr&&ey>=yr;
+  }).sort((a,b)=>a.startDate.localeCompare(b.startDate));
+
+  let html=`<div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+    <button class="btn-save" onclick="openTravelModal()" style="border-radius:20px;font-size:12px;padding:6px 16px">+ Add Travel</button>
+  </div>`;
+
+  // 연간 달력 (12개월 그리드)
+  html+=`<div class="year-view" style="margin-bottom:14px">`;
+  for(let mo=0;mo<12;mo++){
+    html+=`<div class="card" style="padding:10px"><div style="font-size:12px;font-weight:500;margin-bottom:7px">${MONTHS[mo]}</div><div class="year-mini">`;
+    ['M','T','W','T','F','S','S'].forEach((d,i)=>html+=`<div class="year-dow" style="${i===5?'color:var(--accent)':i===6?'color:var(--red)':''}">${d}</div>`);
+    const first=new Date(yr,mo,1),last=new Date(yr,mo+1,0);
+    const offset=(first.getDay()||7)-1;
+    for(let i=0;i<offset;i++)html+=`<div class="year-day other"></div>`;
+    for(let d=1;d<=last.getDate();d++){
+      const ds=ym(yr,mo,d),isT=ds===todayStr();
+      const dow=new Date(yr,mo,d).getDay(),di=dow===0?6:dow-1;
+      const holiday=isHol(ds);
+      // 여행 기간 체크
+      const inTravel=data.travels.find(t=>t.startDate<=ds&&t.endDate>=ds);
+      let style='';
+      if(inTravel&&!isT)style=`background:${evBg(inTravel.color)};color:${evTxt(inTravel.color)};border-radius:3px;`;
+      const cls='year-day'+(isT?' today':holiday&&!isT?' sun':di===5&&!isT?' sat':di===6&&!isT?' sun':'');
+      html+=`<div class="${cls}" style="${style}" title="${inTravel?inTravel.name:''}">${d}</div>`;
+    }
+    html+=`</div></div>`;
+  }
+  html+=`</div>`;
+
+  // 해당 연도 여행 목록
+  html+=`<div class="card" style="overflow:hidden">
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between">
+      ${yr}년 여행 <span style="font-size:11px;color:var(--text3);font-weight:400">${yearTravels.length}건</span>
+    </div>`;
+  if(yearTravels.length===0){
+    html+=`<div class="empty">여행 기록이 없어요 ✈️</div>`;
+  } else {
+    yearTravels.forEach(t=>{
+      const start=parseDate(t.startDate),end=parseDate(t.endDate);
+      const nights=Math.round((end-start)/(1000*60*60*24));
+      html+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer" onclick="openTravelModal('${t.id}')">
+        <div style="width:10px;height:10px;border-radius:50%;background:${t.color};flex-shrink:0"></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:500">${escH(t.name)}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">
+            ${t.destination?`📍${escH(t.destination)} · `:''}${t.startDate} ~ ${t.endDate} (${nights}박${nights+1}일)
+          </div>
+          ${t.memo?`<div style="font-size:11px;color:var(--text2);margin-top:2px">${escH(t.memo)}</div>`:''}
+        </div>
+        <div style="font-size:20px">✈️</div>
+      </div>`;
+    });
+  }
+  html+=`</div>`;
+  document.getElementById('main-content').innerHTML=html;
+}
+
+function openTravelModal(id){
+  _editTravelId=id||null;
+  const t=id?data.travels.find(x=>x.id===id):null;
+  document.getElementById('travel-modal-title').textContent=id?'✈️ Edit Travel':'✈️ Add Travel';
+  document.getElementById('travel-modal-id').value=id||'';
+  document.getElementById('travel-name').value=t?t.name:'';
+  document.getElementById('travel-dest').value=t?t.destination||'':'';
+  document.getElementById('travel-start').value=t?t.startDate:fmtDate(state.cursor);
+  document.getElementById('travel-end').value=t?t.endDate:fmtDate(state.cursor);
+  document.getElementById('travel-memo').value=t?t.memo||'':'';
+  document.getElementById('travel-del-btn').style.display=id?'':'none';
+  _travelColor=t?t.color:PALETTE[0];
+  renderTravelColors();
+  document.getElementById('travel-modal').style.display='flex';
+  pushUiState('travel-modal');
+}
+function closeTravelModal(){document.getElementById('travel-modal').style.display='none';}
+function renderTravelColors(){
+  let h='';
+  PALETTE.forEach(c=>h+=`<div class="color-sw${c===_travelColor?' selected':''}" style="background:${c}" onclick="_travelColor='${c}';renderTravelColors()"></div>`);
+  document.getElementById('travel-colors').innerHTML=h;
+}
+async function saveTravel(){
+  const name=document.getElementById('travel-name').value.trim();
+  const dest=document.getElementById('travel-dest').value.trim();
+  const startDate=document.getElementById('travel-start').value;
+  const endDate=document.getElementById('travel-end').value;
+  const memo=document.getElementById('travel-memo').value.trim();
+  if(!name||!startDate||!endDate){alert('이름, 시작일, 종료일을 입력해주세요.');return;}
+  if(startDate>endDate){alert('종료일이 시작일보다 빠릅니다.');return;}
+  if(_editTravelId){
+    const t=data.travels.find(x=>x.id===_editTravelId);
+    if(t){Object.assign(t,{name,destination:dest,startDate,endDate,color:_travelColor,memo});}
+  } else {
+    data.travels.push({id:makeId(),name,destination:dest,startDate,endDate,color:_travelColor,memo});
+  }
+  closeTravelModal();renderTravel();
+  // localStorage 임시 저장 (Supabase travel 테이블 추가 전)
+  try{localStorage.setItem('travels_'+currentUser.id,JSON.stringify(data.travels));}catch(e){}
+}
+async function deleteTravel(){
+  if(!_editTravelId)return;
+  data.travels=data.travels.filter(t=>t.id!==_editTravelId);
+  closeTravelModal();renderTravel();
+  try{localStorage.setItem('travels_'+currentUser.id,JSON.stringify(data.travels));}catch(e){}
+}
+function loadTravelsLocal(){
+  if(!currentUser)return;
+  try{
+    const saved=localStorage.getItem('travels_'+currentUser.id);
+    if(saved)data.travels=JSON.parse(saved);
+  }catch(e){}
+}
+
+
 // ── Event Modal ───────────────────────────────────────────
 let _mMode='add',_mId=null,_mType='timed',_mColor='';
 
@@ -1465,6 +1665,7 @@ function openAddModal(date){
   setModalType('timed');
   renderColorSwatches();
   document.getElementById('modal').style.display='flex';
+  pushUiState('modal');
   setTimeout(()=>document.getElementById('m-title').focus(),100);
 }
 
@@ -1508,6 +1709,7 @@ function openEditItem(type,id){
   setModalType(type);
   renderColorSwatches();
   document.getElementById('modal').style.display='flex';
+  pushUiState('modal');
 }
 
 function setModalType(t){
@@ -1644,9 +1846,9 @@ function updateTpProj(){
 function toggleTodos(){
   const p=document.getElementById('todo-panel');
   if(p.style.display==='none'||!p.style.display){
-    // fill project select
     updateTpProj();
     renderTodoPanel();p.style.display='flex';
+    pushUiState('todo-panel');
   }else p.style.display='none';
 }
 function closeTodoPanel(){document.getElementById('todo-panel').style.display='none';}
@@ -1706,7 +1908,7 @@ async function addPanelTodo(){
 
 // ── Projects ──────────────────────────────────────────────
 let _newProjColor=PALETTE[0];
-function openProjModal(){renderProjEdit();document.getElementById('proj-modal').style.display='flex';}
+function openProjModal(){renderProjEdit();document.getElementById('proj-modal').style.display='flex';pushUiState('proj-modal');}
 function closeProjModal(){document.getElementById('proj-modal').style.display='none';}
 function renderProjEdit(){
   const projs=orderedProjects();
@@ -1761,7 +1963,7 @@ async function deleteProj(id){
 }
 
 // ── Anniversaries ─────────────────────────────────────────
-function openAnnivModal(){renderAnnivList();document.getElementById('anniv-modal').style.display='flex';}
+function openAnnivModal(){renderAnnivList();document.getElementById('anniv-modal').style.display='flex';pushUiState('anniv-modal');}
 function closeAnnivModal(){document.getElementById('anniv-modal').style.display='none';}
 function openAddAnniv(){document.getElementById('anniv-add-form').style.display='';document.getElementById('anniv-name').focus();}
 function closeAddAnniv(){document.getElementById('anniv-add-form').style.display='none';}
@@ -1802,7 +2004,7 @@ async function deleteAnniv(id){
 
 // ── Timed Categories ──────────────────────────────────────
 let _tcColor=PALETTE[0];
-function openTimedCatModal(){renderTcList();renderTcColors();document.getElementById('timed-cat-modal').style.display='flex';}
+function openTimedCatModal(){renderTcList();renderTcColors();document.getElementById('timed-cat-modal').style.display='flex';pushUiState('timed-cat-modal');}
 function closeTimedCatModal(){document.getElementById('timed-cat-modal').style.display='none';}
 function renderTcColors(){let h='';PALETTE.forEach(c=>h+=`<div class="color-sw${c===_tcColor?' selected':''}" style="background:${c}" onclick="_tcColor='${c}';renderTcColors()"></div>`);document.getElementById('tc-colors').innerHTML=h;}
 function renderTcList(){
@@ -1945,13 +2147,23 @@ function exportData(){
 }
 
 // ── History & Mobile ──────────────────────────────────────
-function setupHistory(){history.pushState({app:true},'',window.location.href);}
+function setupHistory(){
+  if(!history.state||!history.state.app){
+    history.replaceState({app:true},'',window.location.href);
+  }
+}
+function pushUiState(type){
+  history.pushState({app:true,ui:type},'',window.location.href);
+}
 window.addEventListener('popstate',()=>{
-  const modals=['modal','todo-panel','proj-modal','anniv-modal','timed-cat-modal','golf-modal','studio-modal'];
-  let closed=false;
-  for(const id of modals){const el=document.getElementById(id);if(el&&el.style.display!=='none'){el.style.display='none';closed=true;break;}}
-  history.pushState({app:true},'',window.location.href);
-  if(!closed&&state.view==='day')setView('month');
+  const modals=['modal','todo-panel','proj-modal','anniv-modal','timed-cat-modal','golf-modal','studio-modal','travel-modal'];
+  for(const id of modals){
+    const el=document.getElementById(id);
+    if(el&&el.style.display!=='none'){el.style.display='none';return;}
+  }
+  const sb=document.getElementById('sidebar');
+  if(sb&&sb.classList.contains('open')){closeSb();return;}
+  if(state.view==='day'){setView('month');return;}
 });
 let _tx=0,_ty=0;
 document.addEventListener('wheel',e=>{if(e.target.closest('.modal-overlay,.sidebar,.work-time-inp,input,textarea,select'))return;clearTimeout(window._wt);window._wt=setTimeout(()=>navigate(e.deltaY>0?1:-1),80);},{passive:true});
