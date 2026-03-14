@@ -329,7 +329,11 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
         <div class="nav-lbl">Records</div>
         <button class="nav-btn" data-view="period" onclick="setView('period')"><span class="nav-icon" style="color:var(--pink)">🌸</span>Period</button>
       </div>
-      <div id="backup-status"></div>
+      <div style="padding:4px 10px;display:flex;gap:6px;flex-wrap:wrap">
+  <button onclick="exportData()" class="nav-btn" style="font-size:10px;padding:3px 8px">⬇ Backup</button>
+  <label class="nav-btn" style="font-size:10px;padding:3px 8px;cursor:pointer">⬆ Restore<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
+</div>
+<div id="backup-status"></div>
     </aside>
 
     <div class="main">
@@ -665,7 +669,7 @@ async function loadAll(){
 
     // Projects - default 5 if empty
     if((prRes.data||[]).length===0){
-      const defs=[{id:'p1',name:'개인',color:'#2D6BE4'},{id:'p2',name:'수업 · 과제',color:'#1D9E75'},{id:'p3',name:'박사 논문',color:'#6C4FBF'},{id:'p4',name:'HAEGOBJ',color:'#D4537E'},{id:'p5',name:'기타',color:'#7C6F5B'}];
+      const defs=[{id:makeId(),name:'개인',color:'#2D6BE4'},{id:makeId(),name:'수업 · 과제',color:'#1D9E75'},{id:makeId(),name:'박사 논문',color:'#6C4FBF'},{id:makeId(),name:'HAEGOBJ',color:'#D4537E'},{id:makeId(),name:'기타',color:'#7C6F5B'}];
       data.projects=defs;
       await sb.from('projects').insert(defs.map(p=>({id:p.id,user_id:uid,name:p.name,color:p.color})));
     } else {
@@ -690,13 +694,32 @@ async function saveTimedEvent(te){
   const{error}=await sb.from('timed_events').upsert({id:te.id,user_id:currentUser.id,title:te.title,date:te.date,time:te.time,category_id:te.categoryId||null});
   if(error){setSyncErr('Save Error');return error.message;}setSynced();return null;
 }
-async function delTimedEvent(id){setSyncing();await sb.from('timed_events').delete().eq('id',id).eq('user_id',currentUser.id);setSynced();}
+async function delTimedEvent(id,backup){
+  setSyncing();
+  const{error}=await sb.from('timed_events').delete().eq('id',id).eq('user_id',currentUser.id);
+  if(error){if(backup)data.timedEvents.push(backup);renderAll();setSyncErr('Delete Error');alert('Delete failed');}
+  else setSynced();
+}
 async function saveProjEvent(ev){
   setSyncing();
   const{error}=await sb.from('events').upsert({id:ev.id,user_id:currentUser.id,title:ev.title,date:ev.date,start:ev.start||null,end:null,project_id:ev.projectId||null,color:ev.color||null,note:ev.note||null});
   if(error){setSyncErr('Save Error');return error.message;}setSynced();return null;
 }
-async function delProjEvent(id){setSyncing();await sb.from('events').delete().eq('id',id).eq('user_id',currentUser.id);setSynced();}
+async function delProjEvent(id,backup,subBackup){
+  setSyncing();
+  const{error}=await sb.from('events').delete().eq('id',id).eq('user_id',currentUser.id);
+  if(error){
+    if(backup)data.projEvents.push(backup);
+    if(subBackup&&subBackup.length)data.tasks.push(...subBackup);
+    renderAll();setSyncErr('Delete Error');alert('Delete failed');
+  } else {
+    // 이벤트 삭제 성공 시 연결된 tasks도 DB에서 삭제
+    if(subBackup&&subBackup.length){
+      await sb.from('todos').delete().in('id',subBackup.map(t=>t.id)).eq('user_id',currentUser.id);
+    }
+    setSynced();
+  }
+}
 async function saveTask(td){
   setSyncing();
   const{error}=await sb.from('todos').upsert({id:td.id,user_id:currentUser.id,title:td.title,date:td.date||null,project_id:td.projectId||null,done:td.done,event_id:td.eventId||null});
@@ -1537,15 +1560,28 @@ async function saveItem(){
     const pid=document.getElementById('m-project').value;
     const td={id:_mMode==='add'?makeId():_mId,title,date,projectId:pid,done:false,eventId:''};
     if(_mMode==='add'){data.tasks.push(td);closeModal();renderAll();const err=await saveTask(td);if(err){data.tasks=data.tasks.filter(t=>t.id!==td.id);renderAll();alert('Error: '+err);}}
-    else{const i=data.tasks.findIndex(t=>t.id===_mId);if(i>=0)data.tasks[i]=td;closeModal();renderAll();const err=await saveTask(td);if(err){renderAll();alert('Error: '+err);}}
+    else{const i=data.tasks.findIndex(t=>t.id===_mId);const oldTd=i>=0?{...data.tasks[i]}:null;if(i>=0)data.tasks[i]=td;closeModal();renderAll();const err=await saveTask(td);if(err){if(i>=0&&oldTd)data.tasks[i]=oldTd;renderAll();alert('Error: '+err);}}
   }
 }
 
 async function deleteItem(){
   if(!_mId)return;
-  if(_mType==='timed'){data.timedEvents=data.timedEvents.filter(t=>t.id!==_mId);closeModal();renderAll();await delTimedEvent(_mId);}
-  else if(_mType==='proj'){data.tasks=data.tasks.filter(t=>t.eventId!==_mId);data.projEvents=data.projEvents.filter(e=>e.id!==_mId);closeModal();renderAll();await delProjEvent(_mId);}
-  else{data.tasks=data.tasks.filter(t=>t.id!==_mId);closeModal();renderAll();await delTask(_mId);}
+  if(_mType==='timed'){
+    const backup=data.timedEvents.find(t=>t.id===_mId);
+    data.timedEvents=data.timedEvents.filter(t=>t.id!==_mId);closeModal();renderAll();
+    await delTimedEvent(_mId,backup);
+  } else if(_mType==='proj'){
+    const backup=data.projEvents.find(e=>e.id===_mId);
+    const subBackup=data.tasks.filter(t=>t.eventId===_mId);
+    data.tasks=data.tasks.filter(t=>t.eventId!==_mId);
+    data.projEvents=data.projEvents.filter(e=>e.id!==_mId);closeModal();renderAll();
+    await delProjEvent(_mId,backup,subBackup);
+  } else {
+    const backup=data.tasks.find(t=>t.id===_mId);
+    data.tasks=data.tasks.filter(t=>t.id!==_mId);closeModal();renderAll();
+    const{error}=await sb.from('todos').delete().eq('id',_mId).eq('user_id',currentUser.id);
+    if(error){if(backup)data.tasks.push(backup);renderAll();alert('Delete failed');}
+  }
 }
 
 function renderSubtasks(subs){
@@ -1566,14 +1602,20 @@ async function addSubtask(){
 // ── Tasks ─────────────────────────────────────────────────
 async function toggleTask(id,checked){
   const td=data.tasks.find(t=>t.id===id);if(!td)return;
+  const prev=td.done;
   td.done=checked;renderAll();
   if(document.getElementById('todo-panel').style.display!=='none')renderTodoPanel();
-  await saveTask(td);
+  const err=await saveTask(td);
+  if(err){td.done=prev;renderAll();alert('Save error: '+err);}
 }
 async function deleteTask(id){
+  const removed=data.tasks.filter(t=>t.id===id);
   data.tasks=data.tasks.filter(t=>t.id!==id);renderAll();
   if(document.getElementById('todo-panel').style.display!=='none')renderTodoPanel();
-  await delTask(id);
+  setSyncing();
+  const{error}=await sb.from('todos').delete().eq('id',id).eq('user_id',currentUser.id);
+  if(error){data.tasks.push(...removed);renderAll();setSyncErr('Delete Error');alert('Delete failed');}
+  else setSynced();
 }
 async function addLinkedTask(evId,date,pid,inp){
   const title=inp.value.trim();if(!title)return;
@@ -1855,6 +1897,47 @@ async function addSchoolSchedule(){
 }
 
 // ── Backup ────────────────────────────────────────────────
+async function importData(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=async function(ev){
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(!d.projects&&!d.projEvents)throw new Error('Invalid backup file');
+      if(!confirm(`Restore backup?\n• ${(d.projects||[]).length} projects\n• ${(d.projEvents||[]).length} events\n• ${(d.tasks||[]).length} tasks\n\nThis will replace all current data.`))return;
+      setSyncing();
+      const uid=currentUser.id;
+      await Promise.all([
+        sb.from('events').delete().eq('user_id',uid),
+        sb.from('todos').delete().eq('user_id',uid),
+        sb.from('projects').delete().eq('user_id',uid),
+        sb.from('timed_events').delete().eq('user_id',uid),
+        sb.from('timed_categories').delete().eq('user_id',uid),
+        sb.from('anniversaries').delete().eq('user_id',uid),
+        sb.from('period_logs').delete().eq('user_id',uid),
+        sb.from('golf').delete().eq('user_id',uid),
+        sb.from('office').delete().eq('user_id',uid),
+        sb.from('cell_colors').delete().eq('user_id',uid),
+      ]);
+      if((d.projects||[]).length)await sb.from('projects').insert(d.projects.map(p=>({id:p.id,user_id:uid,name:p.name,color:p.color})));
+      if((d.projEvents||[]).length)await sb.from('events').insert(d.projEvents.map(ev=>({id:ev.id,user_id:uid,title:ev.title,date:ev.date,start:ev.start||null,end:null,project_id:ev.projectId||null,color:ev.color||null,note:ev.note||null})));
+      if((d.tasks||[]).length)await sb.from('todos').insert(d.tasks.map(td=>({id:td.id,user_id:uid,title:td.title,date:td.date||null,project_id:td.projectId||null,done:td.done,event_id:td.eventId||null})));
+      if((d.timedCats||[]).length)await sb.from('timed_categories').insert(d.timedCats.map(c=>({id:c.id,user_id:uid,name:c.name,color:c.color,emoji:c.emoji||''})));
+      if((d.timedEvents||[]).length)await sb.from('timed_events').insert(d.timedEvents.map(t=>({id:t.id,user_id:uid,title:t.title,date:t.date,time:t.time,category_id:t.categoryId||null})));
+      if((d.anniversaries||[]).length)await sb.from('anniversaries').insert(d.anniversaries.map(a=>({id:a.id,user_id:uid,name:a.name,emoji:a.emoji,month:a.month,day:a.day,year:a.year||null,repeat_yearly:a.repeatYearly})));
+      if((d.periodLogs||[]).length)await sb.from('period_logs').insert(d.periodLogs.map(p=>({id:p.id,user_id:uid,start_date:p.startDate})));
+      for(const[ds,rec]of Object.entries(d.golf||{}))await saveGolfRec(ds,rec);
+      for(const[ds,rec]of Object.entries(d.office||{}))await saveOfficeRec(ds,rec);
+      for(const[ds,c]of Object.entries(d.cellColors||{}))await saveCellColor(ds,c);
+      if(d.homeNote)await saveHomeNote(d.homeNote);
+      await loadAll();
+      document.getElementById('backup-status').textContent='Restored ✓';
+      setTimeout(()=>document.getElementById('backup-status').textContent='',3000);
+    }catch(err){setSyncErr('Restore failed');alert(err.message);}
+    e.target.value='';
+  };
+  reader.readAsText(file);
+}
 function exportData(){
   const obj={projects:data.projects,timedCats:data.timedCats,timedEvents:data.timedEvents,projEvents:data.projEvents,tasks:data.tasks,golf:data.golf,office:data.office,cellColors:data.cellColors,anniversaries:data.anniversaries,periodLogs:data.periodLogs,homeNote:data.homeNote,classMemos:data.classMemos,projOrder:data.projOrder,exportedAt:new Date().toISOString()};
   const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});
