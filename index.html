@@ -325,7 +325,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 
       <div class="nav-sec">
         <div class="nav-lbl">Work</div>
-        <button class="nav-btn" data-view="haegobj" onclick="setView('haegobj')"><span class="nav-icon">🏷</span>HAEGOBJ</button>
+        <button class="nav-btn" data-view="haegobj" onclick="setView('haegobj')"><span class="nav-icon">👗</span>HAEGOBJ</button>
         <button class="nav-btn" data-view="studio" onclick="setView('studio')"><span class="nav-icon" style="color:#0891B2">🏢</span>Studio</button>
         <button class="nav-btn" data-view="golf" onclick="setView('golf')"><span class="nav-icon" style="color:#BA7517">⛳</span>Golf</button>
       </div>
@@ -1358,10 +1358,10 @@ function renderHaegobj(){
     week.forEach((ds,di)=>{
       const d=parseDate(ds);
       const isToday=ds===todS;
-      const isHol=isHoliday(ds);
+      const isHol_=isHol(ds);
       const dow=d.getDay();
       const isSat=dow===6,isSun=dow===0;
-      const numColor=isHol||isSun?'var(--red)':isSat?'var(--accent)':'var(--text2)';
+      const numColor=isHol_||isSun?'var(--red)':isSat?'var(--accent)':'var(--text2)';
       const memo=data.haegobjMemos[ds]||'';
       const borderR=di<6?'border-right:1px solid var(--border);':'';
 
@@ -1369,7 +1369,7 @@ function renderHaegobj(){
         <div style="font-size:11px;font-weight:${isToday?700:500};color:${isToday?'var(--accent)':numColor};display:flex;align-items:center;gap:4px;flex-shrink:0">
           ${d.getDate()}
           ${isToday?'<span style="font-size:9px;background:var(--accent);color:#fff;padding:0 4px;border-radius:6px">today</span>':''}
-          ${isHol?`<span style="font-size:9px;color:var(--red)">${holName(ds)}</span>`:''}
+          ${isHol_?`<span style="font-size:9px;color:var(--red)">${holName(ds)}</span>`:''}
         </div>
         <textarea
           id="hobj-${ds}"
@@ -1377,8 +1377,8 @@ function renderHaegobj(){
           style="flex:1;resize:none;border:1px solid transparent;border-radius:var(--radius-xs);padding:4px 6px;font-size:11px;font-family:var(--font);background:${memo?'var(--surface2)':'transparent'};color:var(--text);outline:none;line-height:1.5;min-height:80px;transition:all 0.1s"
           onfocus="this.style.borderColor='var(--accent)';this.style.background='var(--bg)'"
           onblur="this.style.borderColor='transparent';this.style.background=this.value?'var(--surface2)':'transparent';saveHaegobjMemo('${ds}',this.value)"
-          onkeydown="if(event.key==='Tab'){event.preventDefault();this.value+='	';}"
-        >${escH(memo)}</textarea>
+          onkeydown="if(event.key==='Tab'){event.preventDefault();this.value+=String.fromCharCode(9);}"
+        ></textarea>
       </div>`;
     });
     html+=`</div>`;
@@ -1386,6 +1386,13 @@ function renderHaegobj(){
 
   html+=`</div>`;
   document.getElementById('main-content').innerHTML=html;
+  // textarea 값 설정 (백틱 이스케이프 문제 방지)
+  weeks.forEach(week=>{
+    week.forEach(ds=>{
+      const el=document.getElementById('hobj-'+ds);
+      if(el)el.value=data.haegobjMemos[ds]||'';
+    });
+  });
 }
 
 let _haegobjTimer={};
