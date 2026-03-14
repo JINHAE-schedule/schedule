@@ -513,9 +513,11 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
     <button class="btn-cancel" onclick="closeStudioModal()">Cancel</button>
     <button class="btn-save" onclick="studioModalSave()">Save</button>
   </div>
+</div>
+</div>
 
 <!-- Travel Modal -->
-<div class="modal-overlay" id="travel-modal" style="display:none" onclick="if(event.target.id==='travel-modal')closeTravelModal()">
+<div class="modal-overlay" id="travel-modal" style="display:none;z-index:1100" onclick="if(event.target.id==='travel-modal')closeTravelModal()">
 <div class="modal" style="width:420px">
   <div class="modal-title" id="travel-modal-title">✈️ Add Travel</div>
   <input type="hidden" id="travel-modal-id">
@@ -529,7 +531,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
     <label>색상</label>
     <div class="color-row" id="travel-colors"></div>
   </div>
-  <div class="form-row"><label>메모</label><textarea id="travel-memo" placeholder="메모..."></textarea></div>
+  <div class="form-row"><label>메모</label><textarea id="travel-memo" placeholder=""></textarea></div>
   <div class="modal-footer">
     <button class="btn-del" id="travel-del-btn" style="display:none" onclick="deleteTravel()">Delete</button>
     <button class="btn-cancel" onclick="closeTravelModal()">Cancel</button>
@@ -1118,7 +1120,7 @@ function renderFiltered(){
           <span style="font-size:13px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(te.title)}</span>
           ${!hasTimedFilter&&c.name?`<span style="font-size:10px;color:${c.color};flex-shrink:0">${c.emoji||''}${c.name}</span>`:''}
         </div>
-        <input type="text" value="${escH(memoVal)}" placeholder="메모..."
+        <input type="text" value="${escH(memoVal)}" placeholder=""
           style="flex:1;min-width:0;padding:4px 10px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font);margin-left:8px"
           onblur="saveEvMemo('te_${te.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()" onclick="event.stopPropagation()">
       </div>`;
@@ -1144,7 +1146,7 @@ function renderFiltered(){
           ${!hasProjFilter?`<span style="font-size:10px;color:${pr.color};flex-shrink:0;width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pr.name}</span>`:''}
           <span style="font-size:13px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(ev.title)}</span>
         </div>
-        <input type="text" value="${escH(memoVal)}" placeholder="메모..."
+        <input type="text" value="${escH(memoVal)}" placeholder=""
           style="flex:1;min-width:0;padding:4px 10px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font);margin-left:8px"
           onblur="saveEvMemo('${ev.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()" onclick="event.stopPropagation()">
       </div>`;
@@ -1368,8 +1370,8 @@ function renderHaegobj(){
           ${hol?`<div style="font-size:8px;color:var(--red);line-height:1.2;text-align:center">${hol}</div>`:''}
         </div>
         <!-- 메모 -->
-        <textarea id="hobj-${ds}" placeholder="메모..."
-          style="width:100%;min-height:72px;padding:6px 8px;border:none;background:transparent;font-size:11px;font-family:var(--font);color:var(--text);outline:none;resize:none;line-height:1.6"
+        <textarea id="hobj-${ds}" placeholder=""
+          style="width:100%;min-height:120px;padding:6px 8px;border:none;background:transparent;font-size:11px;font-family:var(--font);color:var(--text);outline:none;resize:none;line-height:1.6"
           onfocus="this.style.background='var(--accent-bg)'"
           onblur="this.style.background='transparent';saveHaegobjMemo('${ds}',this.value)"
         ></textarea>
@@ -2026,6 +2028,7 @@ function openTravelModalDate(ds){
 }
 
 function openTravelModal(id){
+  console.log('openTravelModal called', id);
   _editTravelId=id||null;
   const t=id?data.travels.find(x=>x.id===id):null;
   document.getElementById('travel-modal-title').textContent=id?'✈️ Edit Travel':'✈️ Add Travel';
