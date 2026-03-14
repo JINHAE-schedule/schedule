@@ -322,6 +322,10 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
         <div class="nav-lbl">Work</div>
         <button class="nav-btn" data-view="studio" onclick="setView('studio')"><span class="nav-icon" style="color:#0891B2">🏢</span>Studio</button>
         <button class="nav-btn" data-view="golf" onclick="setView('golf')"><span class="nav-icon" style="color:#BA7517">⛳</span>Golf</button>
+      </div>
+      <div class="nav-div"></div>
+      <div class="nav-sec">
+        <div class="nav-lbl">Records</div>
         <button class="nav-btn" data-view="period" onclick="setView('period')"><span class="nav-icon" style="color:var(--pink)">🌸</span>Period</button>
       </div>
       <div id="backup-status"></div>
@@ -489,6 +493,28 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
   </div>
 </div>
 </div>
+
+<!-- Studio Modal -->
+<div class="modal-overlay" id="studio-modal" style="display:none" onclick="if(event.target.id==='studio-modal')closeStudioModal()">
+<div class="modal" style="width:320px">
+  <div class="modal-title">🏢 <span id="studio-modal-date"></span></div>
+  <input type="hidden" id="studio-modal-ds">
+  <div class="form-row">
+    <label>출근</label>
+    <input type="time" id="studio-in" style="width:140px">
+  </div>
+  <div class="form-row">
+    <label>퇴근</label>
+    <input type="time" id="studio-out" style="width:140px">
+  </div>
+  <div class="modal-footer">
+    <button class="btn-del" id="studio-del-btn" style="display:none" onclick="studioModalDel()">Delete</button>
+    <button class="btn-cancel" onclick="closeStudioModal()">Cancel</button>
+    <button class="btn-save" onclick="studioModalSave()">Save</button>
+  </div>
+</div>
+</div>
+
 <script>
 // ── Supabase ──────────────────────────────────────────────
 const SB_URL='https://xrhmqumgskdmwklihhva.supabase.co';
@@ -553,8 +579,9 @@ function projEventsOn(ds){
   if(state.projFilter)evs=evs.filter(e=>e.projectId===state.projFilter);
   return evs;
 }
-function tasksOn(ds){
+function tasksOn(ds,noSub){
   let tds=data.tasks.filter(t=>t.date===ds);
+  if(noSub)tds=tds.filter(t=>!t.eventId); // 세부항목 제외
   if(state.projFilter)tds=tds.filter(t=>t.projectId===state.projFilter);
   return tds;
 }
@@ -679,12 +706,12 @@ async function saveProj(p){setSyncing();const{error}=await sb.from('projects').u
 async function delProj(id){setSyncing();await sb.from('projects').delete().eq('id',id).eq('user_id',currentUser.id);setSynced();}
 async function saveGolfRec(ds,rec){
   setSyncing();
-  const{error}=rec?await sb.from('golf').upsert({user_id:currentUser.id,date:ds,rounds:rec.rounds||[],weather:rec.weather||''}):await sb.from('golf').delete().eq('date',ds).eq('user_id',currentUser.id);
+  const{error}=rec?await sb.from('golf').upsert({user_id:currentUser.id,date:ds,rounds:rec.rounds||[],weather:rec.weather||''},{onConflict:'user_id,date'}):await sb.from('golf').delete().eq('date',ds).eq('user_id',currentUser.id);
   if(error)setSyncErr('Save Error');else setSynced();
 }
 async function saveOfficeRec(ds,rec){
   setSyncing();
-  const{error}=rec&&(rec.in||rec.out)?await sb.from('office').upsert({user_id:currentUser.id,date:ds,time_in:rec.in||'',time_out:rec.out||''}):await sb.from('office').delete().eq('date',ds).eq('user_id',currentUser.id);
+  const{error}=rec&&(rec.in||rec.out)?await sb.from('office').upsert({user_id:currentUser.id,date:ds,time_in:rec.in||'',time_out:rec.out||''},{onConflict:'user_id,date'}):await sb.from('office').delete().eq('date',ds).eq('user_id',currentUser.id);
   if(error)setSyncErr('Save Error');else setSynced();
 }
 async function saveCellColor(ds,color){
@@ -775,12 +802,20 @@ function renderSidebar(){
 }
 function renderFilterBar(){
   const bar=document.getElementById('filter-bar');
-  if(!state.projFilter){bar.style.display='none';return;}
-  const p=proj(state.projFilter);
+  if(!state.projFilter&&!state.timedFilter){bar.style.display='none';return;}
   bar.style.display='flex';
-  bar.innerHTML=`<span style="font-size:12px;color:var(--text3)">Filter:</span>
-    <span class="filter-chip" style="background:${p.color}">${escH(p.name)}</span>
-    <button onclick="setProjFilter(null)" class="btn-cancel" style="font-size:11px;padding:2px 8px;border-radius:12px">Clear</button>`;
+  let html='<span style="font-size:12px;color:var(--text3)">Filter:</span>';
+  if(state.projFilter){
+    const p=proj(state.projFilter);
+    html+=`<span class="filter-chip" style="background:${p.color}">${escH(p.name)}</span>
+      <button onclick="setProjFilter(null)" class="btn-cancel" style="font-size:11px;padding:2px 8px;border-radius:12px">✕</button>`;
+  }
+  if(state.timedFilter){
+    const c=timedCat(state.timedFilter);
+    html+=`<span class="filter-chip" style="background:${c.color}">${c.emoji?c.emoji+' ':''}${escH(c.name)}</span>
+      <button onclick="setTimedFilter(null)" class="btn-cancel" style="font-size:11px;padding:2px 8px;border-radius:12px">✕</button>`;
+  }
+  bar.innerHTML=html;
 }
 
 // ── Home ──────────────────────────────────────────────────
@@ -873,10 +908,38 @@ function renderMonth(){
     </div>`;
     timedEventsOn(ds).forEach(te=>{const cat=timedCat(te.categoryId),c=cat.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)};display:flex;gap:2px" onclick="event.stopPropagation();openEditItem('timed','${te.id}')"><span style="opacity:.75;font-size:9px;flex-shrink:0">${te.time}</span><span style="overflow:hidden;text-overflow:ellipsis">${escH(te.title)}</span></div>`;});
     projEventsOn(ds).forEach(ev=>{const p=proj(ev.projectId),c=p.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}" onclick="event.stopPropagation();openEditItem('proj','${ev.id}')">${escH(ev.title)}</div>`;});
-    tasksOn(ds).filter(t=>!t.eventId).forEach(td=>{const p=proj(td.projectId),c=p.color||'#999';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}">${td.done?'✓ ':''}${escH(td.title)}</div>`;});
+    tasksOn(ds,true).forEach(td=>{const p=proj(td.projectId),c=p.color||'#999';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}">${td.done?'✓ ':''}${escH(td.title)}</div>`;});
     html+=`</div>`;
   });
   html+=`</div></div>`;
+
+  // If timed filter active, show timed events list below
+  if(state.timedFilter){
+    const cat=timedCat(state.timedFilter);
+    const tes=data.timedEvents.filter(t=>t.categoryId===state.timedFilter).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+    html+=`<div class="card" style="margin-top:14px;overflow:hidden">
+      <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px">
+        <span style="width:10px;height:10px;border-radius:50%;background:${cat.color};display:inline-block"></span>${cat.emoji?cat.emoji+' ':''}${escH(cat.name)} 일정
+      </div>`;
+    if(tes.length===0)html+=`<div class="empty">No events</div>`;
+    else tes.forEach(te=>{
+      const memoKey=`te_memo_${te.id}`;
+      const memoVal=data.classMemos[memoKey]||'';
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid var(--border)">
+        <div style="cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0" onclick="openEditItem('timed','${te.id}')">
+          <span style="font-size:11px;color:var(--text3);width:76px;flex-shrink:0">${te.date}</span>
+          <span style="font-size:11px;font-weight:600;color:${cat.color};width:36px;flex-shrink:0">${te.time}</span>
+          <span style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px">${escH(te.title)}</span>
+        </div>
+        <input type="text" value="${escH(memoVal)}" placeholder="메모..."
+          style="flex:1;min-width:0;padding:4px 10px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font);margin-left:8px"
+          onblur="saveEvMemo('te_${te.id}',this.value)"
+          onkeydown="if(event.key==='Enter')this.blur()"
+          onclick="event.stopPropagation()">
+      </div>`;
+    });
+    html+=`</div>`;
+  }
 
   // If project filter active, show all events below
   if(state.projFilter){
@@ -892,12 +955,12 @@ function renderMonth(){
       const memoKey=`ev_memo_${ev.id}`;
       const memoVal=data.classMemos[memoKey]||'';
       html+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid var(--border)">
-        <div style="cursor:pointer;flex:1;display:flex;align-items:center;gap:8px" onclick="openEditItem('proj','${ev.id}')">
-          <span style="font-size:11px;color:var(--text3);width:80px;flex-shrink:0">${ev.date}</span>
-          <span style="font-size:13px">${escH(ev.title)}</span>
+        <div style="cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:0" onclick="openEditItem('proj','${ev.id}')">
+          <span style="font-size:11px;color:var(--text3);width:76px;flex-shrink:0">${ev.date}</span>
+          <span style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px">${escH(ev.title)}</span>
         </div>
         <input type="text" value="${escH(memoVal)}" placeholder="메모..."
-          style="width:180px;padding:3px 8px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font)"
+          style="flex:1;min-width:0;padding:4px 10px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font);margin-left:8px"
           onblur="saveEvMemo('${ev.id}',this.value)"
           onkeydown="if(event.key==='Enter')this.blur()"
           onclick="event.stopPropagation()">
@@ -946,7 +1009,7 @@ function renderYear(){
 }
 // ── Day View ──────────────────────────────────────────────
 if(!window.dayBlocks)window.dayBlocks={};
-if(!window.dayBlockCols)window.dayBlockCols=['작업','학습','기타'];
+if(!window.dayBlockCols)window.dayBlockCols=['','',''];
 function renderDay(){
   const ds=fmtDate(state.cursor);
   const tes=timedEventsOn(ds),pevs=projEventsOn(ds),alltds=tasksOn(ds);
@@ -984,6 +1047,7 @@ function renderDay(){
   html+=`</div>`;
 
   // Time blocks — columns = active projects today
+  html+=`<div style="display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:12px;align-items:start">`;
   html+=`<div class="card" style="overflow:hidden">
     <div style="padding:9px 14px;font-size:13px;font-weight:500;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       Time Blocks
@@ -993,15 +1057,15 @@ function renderDay(){
           onblur="setBlockCol(${i},this.value)" onkeydown="if(event.key==='Enter')this.blur()">`).join('')}
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:44px repeat(3,1fr);border-bottom:1px solid var(--border);background:var(--surface2)">
+    <div style="display:grid;grid-template-columns:32px repeat(3,1fr);border-bottom:1px solid var(--border);background:var(--surface2)">
       <div></div>`;
   cols.forEach((c,i)=>html+=`<div style="font-size:10px;font-weight:600;color:var(--accent);padding:5px 4px;text-align:center;border-left:1px solid var(--border)">${escH(c)}</div>`);
   html+=`</div>`;
   const hrs=[];for(let h=7;h<=30;h++)hrs.push(h%24);
   hrs.forEach((h,hi)=>{
     const hs=String(h).padStart(2,'0')+':00';
-    html+=`<div style="display:grid;grid-template-columns:44px repeat(3,1fr);border-bottom:1px solid var(--border);min-height:32px">
-      <div style="font-size:10px;color:var(--text3);padding:3px 3px 0;text-align:right;line-height:1">${hs}</div>`;
+    html+=`<div style="display:grid;grid-template-columns:32px repeat(3,1fr);border-bottom:1px solid var(--border);min-height:26px">
+      <div style="font-size:9px;color:var(--text3);padding:2px 2px 0;text-align:right;line-height:1">${hs}</div>`;
     cols.forEach((colName,ci)=>{
       const key=`${h}_col${ci}`;
       const has=key in window.dayBlocks[ds];
@@ -1027,8 +1091,9 @@ function renderDay(){
   });
   html+=`</div>`;
 
-  // Tasks - side by side with nothing (full width)
-  html+=`<div class="card" style="overflow:hidden">
+  html+=`</div>`; // close timeblock card
+  // Tasks - right column
+  html+=`<div class="card" style="overflow:hidden;max-height:80vh;overflow-y:auto">
     <div style="padding:9px 14px;font-size:13px;font-weight:500;border-bottom:1px solid var(--border)">Tasks</div>`;
   const linkedIds=new Set();
   pevs.forEach(ev=>{
@@ -1056,7 +1121,7 @@ function renderDay(){
   html+=`<div class="quick-add">
     <input type="text" id="day-task-inp" placeholder="Add task..." onkeydown="if(event.key==='Enter')addDayTask('${ds}')">
     <button onclick="addDayTask('${ds}')">+</button>
-  </div></div>`;
+  </div></div></div>`; // close tasks card + grid wrapper
   html+=`</div>`;
   document.getElementById('main-content').innerHTML=html;
 }
@@ -1214,17 +1279,22 @@ function renderStudio(){
     const capped=Math.min(diff,600);
     const lbl=diff>0?`${Math.floor(diff/60)}h${diff%60>0?String(diff%60).padStart(2,'0')+'m':''}${diff>600?` (${Math.floor(capped/60)}h)`:''}`:'';
     const holiday=isHol(ds)&&!isTod;
+    let studioContent='';
+    if(diff>0){
+      studioContent=`<div style="font-size:10px;color:#0891B2;margin-top:3px;cursor:pointer" onclick="openStudioModal('${ds}')">
+        <div>▶ ${rec.in||''}</div>
+        <div>◀ ${rec.out||''}</div>
+        <div style="font-weight:600;margin-top:2px">${lbl}</div>
+      </div>`;
+    } else {
+      studioContent=`<div class="golf-empty" onclick="openStudioModal('${ds}')">+</div>`;
+    }
     html+=`<div class="work-cell office-cell${isTod?' today':''}${holiday?' sun':dow===6&&!isTod?' sat':dow===0&&!isTod?' sun':''}${diff>0?' worked':''}">
       <div class="work-num" style="display:flex;align-items:center;justify-content:space-between;${holiday?'color:var(--red)':''}">
         <span>${d}${holiday?`<span style="font-size:8px;margin-left:2px">${holName(ds)}</span>`:''}</span>
+        ${diff>0?`<span onclick="openStudioModal('${ds}')" style="font-size:9px;color:var(--text3);cursor:pointer">✎</span>`:''}
       </div>
-      <input class="work-time-inp" type="time" title="출근" value="${rec.in||''}" id="in-${ds}" onchange="studioChange('${ds}')">
-      <input class="work-time-inp" type="time" title="퇴근" value="${rec.out||''}" id="out-${ds}" onchange="studioChange('${ds}')">
-      ${lbl?`<div class="work-hr-lbl">${lbl}</div>`:''}
-      <div class="studio-save-row">
-        <button class="studio-save-btn" onclick="studioSave('${ds}')">Save</button>
-        ${diff>0?`<button class="studio-del-btn" onclick="studioDel('${ds}')">✕</button>`:''}
-      </div>
+      ${studioContent}
     </div>`;
   }
   html+=`</div></div>`;
@@ -1241,14 +1311,31 @@ function renderStudio(){
   </div></div></div>`;
   document.getElementById('main-content').innerHTML=html;
 }
-function studioChange(ds){/* just updates UI, save on button */}
-async function studioSave(ds){
-  const inEl=document.getElementById('in-'+ds),outEl=document.getElementById('out-'+ds);
-  if(!inEl||!outEl)return;
-  const rec={in:inEl.value,out:outEl.value};
+function openStudioModal(ds){
+  const rec=data.office[ds]||{};
+  const d=parseDate(ds);
+  document.getElementById('studio-modal-date').textContent=`${d.getMonth()+1}월 ${d.getDate()}일`;
+  document.getElementById('studio-modal-ds').value=ds;
+  document.getElementById('studio-in').value=rec.in||'';
+  document.getElementById('studio-out').value=rec.out||'';
+  document.getElementById('studio-del-btn').style.display=rec.in||rec.out?'':'none';
+  document.getElementById('studio-modal').style.display='flex';
+}
+function closeStudioModal(){document.getElementById('studio-modal').style.display='none';}
+async function studioModalSave(){
+  const ds=document.getElementById('studio-modal-ds').value;
+  const inV=document.getElementById('studio-in').value;
+  const outV=document.getElementById('studio-out').value;
+  const rec={in:inV,out:outV};
   data.office[ds]=rec;
-  renderStudio();
+  closeStudioModal();renderStudio();
   await saveOfficeRec(ds,rec);
+}
+async function studioModalDel(){
+  const ds=document.getElementById('studio-modal-ds').value;
+  delete data.office[ds];
+  closeStudioModal();renderStudio();
+  await saveOfficeRec(ds,null);
 }
 async function studioDel(ds){delete data.office[ds];renderStudio();await saveOfficeRec(ds,null);}
 
@@ -1501,20 +1588,46 @@ function toggleTodos(){
 function closeTodoPanel(){document.getElementById('todo-panel').style.display='none';}
 function toggleHideDone(){_hideDone=!_hideDone;document.getElementById('hide-done-btn').textContent=_hideDone?'Show Done':'Hide Done';renderTodoPanel();}
 function renderTodoPanel(){
-  let tds=data.tasks.filter(t=>!t.eventId);
-  if(_hideDone)tds=tds.filter(t=>!t.done);
+  // 독립 태스크
+  let indep=data.tasks.filter(t=>!t.eventId);
+  if(_hideDone)indep=indep.filter(t=>!t.done);
+
   let h='';
-  if(tds.length===0){h=`<div class="empty">No tasks</div>`;}
-  else{
+  if(indep.length===0&&data.projEvents.length===0){h=`<div class="empty">No tasks</div>`;}
+
+  // 프로젝트 이벤트별 세부항목
+  const eventsWithSubs=data.projEvents.filter(ev=>data.tasks.some(t=>t.eventId===ev.id));
+  eventsWithSubs.forEach(ev=>{
+    const subs=data.tasks.filter(t=>t.eventId===ev.id);
+    const filtered=_hideDone?subs.filter(t=>!t.done):subs;
+    if(filtered.length===0)return;
+    const p=proj(ev.projectId),c=p.color||'#4472C4';
+    h+=`<div style="padding:5px 14px 2px;font-size:11px;font-weight:600;color:${c};display:flex;align-items:center;gap:5px;cursor:pointer" onclick="openEditItem('proj','${ev.id}')">
+      <span style="width:6px;height:6px;border-radius:50%;background:${c};display:inline-block"></span>${escH(ev.title)}
+      <span style="font-size:10px;color:var(--text3);font-weight:400">${ev.date}</span>
+    </div>`;
+    filtered.forEach(td=>{
+      h+=`<div class="todo-item" style="padding-left:26px">
+        <input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked)">
+        <span class="todo-txt${td.done?' done':''}" style="flex:1">${escH(td.title)}</span>
+        <button class="todo-del" onclick="deleteTask('${td.id}')">✕</button>
+      </div>`;
+    });
+  });
+
+  // 독립 태스크 (프로젝트별 그룹)
+  if(indep.length>0){
+    if(eventsWithSubs.length>0)h+=`<div style="height:1px;background:var(--border);margin:6px 0"></div>`;
     const byProj={};
-    tds.forEach(td=>{const pid=td.projectId||'_none';if(!byProj[pid])byProj[pid]=[];byProj[pid].push(td);});
+    indep.forEach(td=>{const pid=td.projectId||'_none';if(!byProj[pid])byProj[pid]=[];byProj[pid].push(td);});
     Object.entries(byProj).forEach(([pid,ptds])=>{
       const p=pid==='_none'?{name:'No Project',color:'var(--text3)'}:proj(pid);
       h+=`<div style="padding:5px 14px 2px;font-size:11px;font-weight:600;color:${p.color};letter-spacing:.5px">${p.name}</div>`;
       ptds.forEach(td=>{h+=`<div class="todo-item"><input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked)"><span class="todo-txt${td.done?' done':''}" style="flex:1">${escH(td.title)}</span><button class="todo-del" onclick="deleteTask('${td.id}')">✕</button></div>`;});
     });
   }
-  document.getElementById('todo-panel-body').innerHTML=h;
+
+  document.getElementById('todo-panel-body').innerHTML=h||`<div class="empty">No tasks</div>`;
 }
 async function addPanelTodo(){
   const inp=document.getElementById('tp-inp');
@@ -1631,8 +1744,35 @@ function renderTcColors(){let h='';PALETTE.forEach(c=>h+=`<div class="color-sw${
 function renderTcList(){
   let h='';
   if(data.timedCats.length===0){h=`<div class="empty">No categories</div>`;}
-  else data.timedCats.forEach(c=>{const cnt=data.timedEvents.filter(t=>t.categoryId===c.id).length;h+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="width:10px;height:10px;border-radius:50%;background:${c.color};flex-shrink:0"></span><span style="font-size:16px">${c.emoji||''}</span><span style="flex:1;font-size:13px">${escH(c.name)}</span><span style="font-size:11px;color:var(--text3)">${cnt}</span><button onclick="deleteTimedCat('${c.id}')" class="todo-del" style="font-size:12px">✕</button></div>`;});
+  else data.timedCats.forEach((c,i)=>{
+    const cnt=data.timedEvents.filter(t=>t.categoryId===c.id).length;
+    h+=`<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--border)">
+      <span style="width:10px;height:10px;border-radius:50%;background:${c.color};flex-shrink:0"></span>
+      <span style="font-size:14px;flex-shrink:0">${c.emoji||''}</span>
+      <input type="text" value="${escH(c.name)}" style="flex:1;padding:3px 7px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font)"
+        onblur="renameTimedCat('${c.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+      <span style="font-size:10px;color:var(--text3)">${cnt}</span>
+      <button onclick="moveTimedCatUp('${c.id}')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:11px;padding:1px 3px" ${i===0?'disabled':''}">▲</button>
+      <button onclick="moveTimedCatDown('${c.id}')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:11px;padding:1px 3px" ${i===data.timedCats.length-1?'disabled':''}">▼</button>
+      <button onclick="deleteTimedCat('${c.id}')" class="todo-del" style="font-size:11px">✕</button>
+    </div>`;
+  });
   document.getElementById('tc-list').innerHTML=h;
+}
+async function renameTimedCat(id,name){
+  const c=data.timedCats.find(x=>x.id===id);if(!c||c.name===name)return;
+  c.name=name;renderSidebar();
+  await sb.from('timed_categories').update({name}).eq('id',id).eq('user_id',currentUser.id);
+}
+function moveTimedCatUp(id){
+  const i=data.timedCats.findIndex(c=>c.id===id);if(i<=0)return;
+  [data.timedCats[i-1],data.timedCats[i]]=[data.timedCats[i],data.timedCats[i-1]];
+  renderTcList();renderSidebar();
+}
+function moveTimedCatDown(id){
+  const i=data.timedCats.findIndex(c=>c.id===id);if(i>=data.timedCats.length-1)return;
+  [data.timedCats[i],data.timedCats[i+1]]=[data.timedCats[i+1],data.timedCats[i]];
+  renderTcList();renderSidebar();
 }
 async function addTimedCat(){
   if(!currentUser)return;
@@ -1702,7 +1842,7 @@ function exportData(){
 // ── History & Mobile ──────────────────────────────────────
 function setupHistory(){history.pushState({app:true},'',window.location.href);}
 window.addEventListener('popstate',()=>{
-  const modals=['modal','todo-panel','proj-modal','anniv-modal','timed-cat-modal','golf-modal'];
+  const modals=['modal','todo-panel','proj-modal','anniv-modal','timed-cat-modal','golf-modal','studio-modal'];
   let closed=false;
   for(const id of modals){const el=document.getElementById(id);if(el&&el.style.display!=='none'){el.style.display='none';closed=true;break;}}
   history.pushState({app:true},'',window.location.href);
