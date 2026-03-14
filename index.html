@@ -325,6 +325,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 
       <div class="nav-sec">
         <div class="nav-lbl">Work</div>
+        <button class="nav-btn" data-view="haegobj" onclick="setView('haegobj')"><span class="nav-icon">🏷</span>HAEGOBJ</button>
         <button class="nav-btn" data-view="studio" onclick="setView('studio')"><span class="nav-icon" style="color:#0891B2">🏢</span>Studio</button>
         <button class="nav-btn" data-view="golf" onclick="setView('golf')"><span class="nav-icon" style="color:#BA7517">⛳</span>Golf</button>
       </div>
@@ -385,27 +386,20 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 
 <!-- Todo Panel -->
 <div class="modal-overlay" id="todo-panel" style="display:none" onclick="if(event.target.id==='todo-panel')closeTodoPanel()">
-<div class="modal" style="width:500px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-    <div class="modal-title" style="margin-bottom:0">Task List</div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <button id="hide-done-btn" onclick="toggleHideDone()" class="btn-cancel" style="font-size:11px;padding:3px 10px;border-radius:12px">Hide Done</button>
-      <button onclick="closeTodoPanel()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:18px">✕</button>
+<div class="modal" style="width:min(960px,95vw);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;padding:0">
+  <!-- 헤더 -->
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0">
+    <div class="modal-title" style="margin-bottom:0">Todo List</div>
+    <div style="display:flex;gap:6px;align-items:center;margin-left:auto">
+      <button onclick="todoPanelNav(-1)" class="btn-cancel" style="padding:3px 10px;font-size:16px">‹</button>
+      <button onclick="todoPanelToday()" class="btn-cancel" style="padding:3px 10px;font-size:11px">Today</button>
+      <button onclick="todoPanelNav(1)" class="btn-cancel" style="padding:3px 10px;font-size:16px">›</button>
+      <button id="hide-done-btn" onclick="toggleHideDone()" class="btn-cancel" style="font-size:11px;padding:3px 10px;border-radius:12px;margin-left:6px">Hide Done</button>
+      <button onclick="closeTodoPanel()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:20px;line-height:1;margin-left:4px">✕</button>
     </div>
   </div>
-  <div style="flex:1;overflow-y:auto" id="todo-panel-body"></div>
-  <div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px">
-    <div style="display:flex;gap:6px">
-      <input type="text" id="tp-inp" placeholder="Add task..." onkeydown="if(event.key==='Enter')addPanelTodo()" style="flex:1;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:13px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font)">
-      <button onclick="addPanelTodo()" style="padding:6px 12px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-xs);cursor:pointer;font-size:16px">+</button>
-    </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap">
-      <input type="date" id="tp-date" value="${todayStr()}" style="padding:4px 6px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:11px;background:var(--bg);color:var(--text);outline:none">
-      <select id="tp-proj-sel" style="flex:1;padding:4px 6px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:11px;background:var(--bg);color:var(--text);outline:none">
-        <option value="">No project</option>
-      </select>
-    </div>
-  </div>
+  <!-- 3일 칸반 -->
+  <div style="flex:1;overflow:hidden;display:flex;gap:0" id="todo-panel-body"></div>
 </div>
 </div>
 
@@ -576,7 +570,7 @@ let data={
   projEvents:[],tasks:[],
   golf:{},office:{},cellColors:{},
   anniversaries:[],periodLogs:[],travels:[],
-  homeNote:'',classMemos:{},
+  homeNote:'',classMemos:{},haegobjMemos:{},
   projOrder:[]
 };
 
@@ -596,7 +590,7 @@ const makeId=()=>{
 };
 const escH=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
-let state={view:'home',cursor:new Date(today),selected:todayStr(),projFilter:null,timedFilter:null};
+let state={view:'home',cursor:new Date(today),selected:todayStr(),projFilter:null,timedFilter:null,filterMode:null,todoPanelDate:todayStr()};
 
 // ── Helpers ───────────────────────────────────────────────
 function proj(id){return data.projects.find(p=>p.id===id)||{name:'',color:'#999'};}
@@ -712,7 +706,17 @@ async function loadAll(){
     data.periodLogs=(plRes.data||[]).map(p=>({id:p.id,startDate:p.start_date})).sort((a,b)=>b.startDate.localeCompare(a.startDate));
     data.travels=(trRes.data||[]).map(t=>({id:t.id,name:t.name,destination:t.destination||'',startDate:t.start_date,endDate:t.end_date,color:t.color||'#4472C4',memo:t.memo||''})).sort((a,b)=>a.startDate.localeCompare(b.startDate));
     data.homeNote=hnRes.data?.note1||'';
-    data.classMemos={};(cmRes.data||[]).forEach(m=>{data.classMemos[`${m.project_id}_${m.week}`]=m.content||'';});
+    data.classMemos={};
+    data.haegobjMemos={};
+    (cmRes.data||[]).forEach(m=>{
+      if(m.project_id&&m.project_id.startsWith('haegobj_')){
+        const ds=m.project_id.replace('haegobj_','');
+        data.haegobjMemos[ds]=m.content||'';
+      } else {
+        data.classMemos[`${m.project_id}_${m.week}`]=m.content||'';
+      }
+    });
+    (cmRes.data||[]).forEach(m=>{if(m.week===0&&!m.project_id.startsWith('haegobj_'))data.classMemos[`ev_memo_${m.project_id}`]=m.content||'';});
     // class_memos week=0은 ev_memo
     (cmRes.data||[]).forEach(m=>{if(m.week===0)data.classMemos[`ev_memo_${m.project_id}`]=m.content||'';});
 
@@ -790,6 +794,7 @@ async function delPeriodLog(id){setSyncing();await sb.from('period_logs').delete
 // ── Navigation ────────────────────────────────────────────
 function setView(v){
   state.view=v;
+  if(v==='month'){state.projFilter=null;state.timedFilter=null;state.filterMode=null;}
   if(window.innerWidth<=768)closeSb();
   document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   renderAll();
@@ -797,6 +802,7 @@ function setView(v){
 function navigate(dir){
   const c=state.cursor;
   if(['day'].includes(state.view))c.setDate(c.getDate()+dir);
+  else if(state.view==='haegobj')c.setDate(c.getDate()+dir*7);
   else if(['month','studio','golf','period','filtered','travel','tasks'].includes(state.view))c.setMonth(c.getMonth()+dir);
   else if(['year'].includes(state.view))c.setFullYear(c.getFullYear()+dir);
   state.cursor=new Date(c);renderAll();
@@ -806,27 +812,19 @@ function selectDay(ds){state.selected=ds;state.cursor=parseDate(ds);renderAll();
 function jumpToDay(ds){state.selected=ds;state.cursor=parseDate(ds);setView('day');}
 function setProjFilter(pid){
   state.projFilter=pid;
-  if(pid)state.timedFilter=null;
-  if(pid){
-    state.view='filtered';
-    document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.remove('active'));
-  } else {
-    state.view='month';
-    document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='month'));
-  }
+  state.timedFilter=null;
+  state.filterMode='proj';
+  state.view='filtered';
+  document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.remove('active'));
   if(window.innerWidth<=768)closeSb();
   renderAll();
 }
 function setTimedFilter(id){
   state.timedFilter=id;
-  if(id)state.projFilter=null;
-  if(id){
-    state.view='filtered';
-    document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.remove('active'));
-  } else {
-    state.view='month';
-    document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='month'));
-  }
+  state.projFilter=null;
+  state.filterMode='timed';
+  state.view='filtered';
+  document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.remove('active'));
   if(window.innerWidth<=768)closeSb();
   renderAll();
 }
@@ -845,12 +843,12 @@ function closeSb(){document.getElementById('sidebar').classList.remove('open');d
 function renderAll(){
   if(!currentUser)return;
   updateTitle();renderSidebar();renderFilterBar();
-  const views={home:renderHome,year:renderYear,month:renderMonth,filtered:renderFiltered,tasks:renderTaskCal,day:renderDay,golf:renderGolf,studio:renderStudio,period:renderPeriod,travel:renderTravel};
+  const views={home:renderHome,year:renderYear,month:renderMonth,filtered:renderFiltered,tasks:renderTaskCal,day:renderDay,haegobj:renderHaegobj,golf:renderGolf,studio:renderStudio,period:renderPeriod,travel:renderTravel};
   (views[state.view]||renderHome)();
 }
 function updateTitle(){
   const c=state.cursor;
-  const titles={home:'🏠 Home',year:c.getFullYear()+'년',filtered:'',tasks:'📋 Tasks — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',travel:'✈️ Travel — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',month:c.getFullYear()+'년 '+(c.getMonth()+1)+'월',day:c.getFullYear()+'년 '+(c.getMonth()+1)+'월 '+c.getDate()+'일 ('+['일','월','화','수','목','금','토'][c.getDay()]+')',golf:'⛳ Golf — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',studio:'🏢 Studio — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',period:'🌸 Period — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월'};
+  const titles={home:'🏠 Home',year:c.getFullYear()+'년',filtered:'',haegobj:'🏷 HAEGOBJ',tasks:'📋 Tasks — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',travel:'✈️ Travel — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',month:c.getFullYear()+'년 '+(c.getMonth()+1)+'월',day:c.getFullYear()+'년 '+(c.getMonth()+1)+'월 '+c.getDate()+'일 ('+['일','월','화','수','목','금','토'][c.getDay()]+')',golf:'⛳ Golf — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',studio:'🏢 Studio — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',period:'🌸 Period — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월'};
   document.getElementById('main-title').textContent=titles[state.view]||'';
 }
 function renderSidebar(){
@@ -1021,23 +1019,46 @@ function renderMonth(){
     document.getElementById('main-content').innerHTML=html;
 }
 
-// ── Filtered View (프로젝트/타임드 개별) ─────────────────────
+// ── Filtered View ────────────────────────────────────────
 function renderFiltered(){
   const yr=state.cursor.getFullYear(),mo=state.cursor.getMonth();
   const todS=todayStr();
+  const mode=state.filterMode; // 'proj' or 'timed'
+  const hasProjFilter=state.projFilter;
+  const hasTimedFilter=state.timedFilter;
 
-  // 헤더
+  // 헤더 정보
   let label='',color='#4472C4',emoji='';
-  if(state.projFilter){const p=proj(state.projFilter);label=p.name;color=p.color;}
-  if(state.timedFilter){const c=timedCat(state.timedFilter);label=c.name;color=c.color;emoji=c.emoji||'';}
+  if(hasProjFilter){const p=proj(hasProjFilter);label=p.name;color=p.color;}
+  else if(hasTimedFilter){const c=timedCat(hasTimedFilter);label=c.name;color=c.color;emoji=c.emoji||'';}
+  else if(mode==='proj'){label='Projects All';color='var(--text2)';}
+  else if(mode==='timed'){label='Timed Events All';color='var(--text2)';}
 
-  let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+  // 이 필터에 해당하는 이벤트들
+  let filteredTimedEvs=[], filteredProjEvs=[];
+  if(mode==='timed'||hasTimedFilter){
+    filteredTimedEvs=hasTimedFilter
+      ?data.timedEvents.filter(t=>t.categoryId===hasTimedFilter)
+      :data.timedEvents;
+  }
+  if(mode==='proj'||hasProjFilter){
+    filteredProjEvs=hasProjFilter
+      ?data.projEvents.filter(e=>e.projectId===hasProjFilter)
+      :data.projEvents;
+  }
+
+  // 이달 이벤트
+  const moStr=`${yr}-${String(mo+1).padStart(2,'0')}`;
+  const monthTimedEvs=filteredTimedEvs.filter(t=>t.date.startsWith(moStr));
+  const monthProjEvs=filteredProjEvs.filter(e=>e.date.startsWith(moStr));
+
+  let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
     <button onclick="navigate(-1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">‹</button>
     <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
     <button onclick="navigate(1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">›</button>
     <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월</span>
-    <span class="filter-chip" style="background:${color}">${emoji?emoji+' ':''}${escH(label)}</span>
-    <button onclick="${state.projFilter?'setProjFilter(null)':'setTimedFilter(null)'}" class="btn-cancel" style="font-size:11px;padding:2px 8px;border-radius:12px">✕ 전체보기</button>
+    <span style="font-size:12px;font-weight:500;padding:3px 10px;border-radius:12px;background:${color==='var(--text2)'?'var(--surface2)':evBg(color)};color:${color==='var(--text2)'?'var(--text2)':evTxt(color)}">${emoji?emoji+' ':''}${escH(label)}</span>
+    <button onclick="setView('month')" class="btn-cancel" style="font-size:11px;padding:2px 8px;border-radius:12px;margin-left:auto">✕ 전체보기</button>
   </div>`;
 
   // 단일 달력
@@ -1053,85 +1074,81 @@ function renderFiltered(){
   const rem=7-(cells.length%7);if(rem<7)for(let i=1;i<=rem;i++)cells.push({date:new Date(yr,mo+1,i),other:true});
 
   cells.forEach(cell=>{
-    const ds=fmtDate(cell.date),isT=ds===todS,isSel=ds===state.selected;
+    const ds=fmtDate(cell.date),isT=ds===todS;
     const dow=cell.date.getDay(),di=dow===0?6:dow-1;
     const hol=!cell.other?holName(ds):'';
     const annivs=!cell.other?getAnnivs(ds):[];
     const numColor=hol?'color:var(--red)':di===5?'color:var(--accent)':di===6?'color:var(--red)':'';
-    const cellBg=!cell.other&&data.cellColors[ds]?data.cellColors[ds]:'';
-    html+=`<div class="month-cell${cell.other?' other':''}${isT?' today':''}${isSel?' selected':''}" style="${cellBg?`background:${cellBg}1A;`:''}"
-      onclick="selectDay('${ds}')"
+    html+=`<div class="month-cell${cell.other?' other':''}${isT?' today':''}"
+      onclick="${!cell.other?`openAddModal('${ds}')`:''}"
       oncontextmenu="event.preventDefault();${!cell.other?`openCellColorPicker('${ds}',event)`:''}">`;
     let lbls='';
     if(!cell.other){
       if(hol)lbls+=`<span style="font-size:9px;color:var(--red);font-weight:500;margin-left:3px">${hol}</span>`;
       annivs.forEach(a=>lbls+=`<span style="font-size:9px;color:var(--accent);font-weight:500;margin-left:3px">${a.emoji||''}${a.name}</span>`);
     }
-    html+=`<div class="month-cell-num" style="${numColor}">
-      <span>${cell.date.getDate()}</span>${lbls}
-    </div>`;
-    // 해당 필터 항목만 표시
-    if(state.timedFilter){
-      timedEventsOn(ds).forEach(te=>{const cat=timedCat(te.categoryId),c=cat.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)};display:flex;gap:2px" onclick="event.stopPropagation();openEditItem('timed','${te.id}')"><span style="opacity:.75;font-size:9px;flex-shrink:0">${te.time}</span><span style="overflow:hidden;text-overflow:ellipsis">${escH(te.title)}</span></div>`;});
-    }
-    if(state.projFilter){
-      projEventsOn(ds).forEach(ev=>{const p=proj(ev.projectId),c=p.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}" onclick="event.stopPropagation();openEditItem('proj','${ev.id}')">${escH(ev.title)}</div>`;});
-    }
+    html+=`<div class="month-cell-num" style="${numColor}"><span>${cell.date.getDate()}</span>${lbls}</div>`;
+    filteredTimedEvs.filter(t=>t.date===ds).sort((a,b)=>a.time.localeCompare(b.time)).forEach(te=>{
+      const cat=timedCat(te.categoryId),c=cat.color||'#4472C4';
+      html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)};display:flex;gap:2px" onclick="event.stopPropagation();openEditItem('timed','${te.id}')"><span style="opacity:.75;font-size:9px;flex-shrink:0">${te.time}</span><span style="overflow:hidden;text-overflow:ellipsis">${escH(te.title)}</span></div>`;
+    });
+    filteredProjEvs.filter(e=>e.date===ds).forEach(ev=>{
+      const p=proj(ev.projectId),c=p.color||'#4472C4';
+      html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}" onclick="event.stopPropagation();openEditItem('proj','${ev.id}')">${escH(ev.title)}</div>`;
+    });
     html+=`</div>`;
   });
   html+=`</div></div>`;
 
-  // 통합 일정 목록
-  if(state.timedFilter){
-    const cat=timedCat(state.timedFilter);
-    const tes=data.timedEvents.filter(t=>t.categoryId===state.timedFilter).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
-    html+=`<div class="card" style="overflow:hidden">
+  // 통합 일정 목록 (전체 기간)
+  if(filteredTimedEvs.length>0){
+    const cat=hasTimedFilter?timedCat(hasTimedFilter):null;
+    const sortedTes=filteredTimedEvs.sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+    html+=`<div class="card" style="overflow:hidden;margin-bottom:12px">
       <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px">
-        <span style="width:10px;height:10px;border-radius:50%;background:${cat.color};display:inline-block"></span>${cat.emoji?cat.emoji+' ':''}${escH(cat.name)} 전체 일정
-        <span style="font-size:11px;color:var(--text3);font-weight:400;margin-left:auto">${tes.length}개</span>
+        ${cat?`<span style="width:10px;height:10px;border-radius:50%;background:${cat.color};display:inline-block"></span>${cat.emoji?cat.emoji+' ':''}${escH(cat.name)}`:'⏰ Timed Events'} 전체 일정
+        <span style="font-size:11px;color:var(--text3);font-weight:400;margin-left:auto">${sortedTes.length}개</span>
       </div>`;
-    if(tes.length===0)html+=`<div class="empty">No events</div>`;
-    else tes.forEach(te=>{
+    sortedTes.forEach(te=>{
+      const c=timedCat(te.categoryId);
       const memoKey=`te_memo_${te.id}`;
       const memoVal=data.classMemos[memoKey]||'';
       html+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid var(--border)">
-        <div style="cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0" onclick="openEditItem('timed','${te.id}')">
+        <div style="cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:0" onclick="openEditItem('timed','${te.id}')">
           <span style="font-size:11px;color:var(--text3);width:76px;flex-shrink:0">${te.date}</span>
-          <span style="font-size:11px;font-weight:600;color:${cat.color};width:36px;flex-shrink:0">${te.time}</span>
+          <span style="font-size:11px;font-weight:600;color:${c.color||'#4472C4'};width:36px;flex-shrink:0">${te.time}</span>
           <span style="font-size:13px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(te.title)}</span>
+          ${!hasTimedFilter&&c.name?`<span style="font-size:10px;color:${c.color};flex-shrink:0">${c.emoji||''}${c.name}</span>`:''}
         </div>
         <input type="text" value="${escH(memoVal)}" placeholder="메모..."
           style="flex:1;min-width:0;padding:4px 10px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font);margin-left:8px"
-          onblur="saveEvMemo('te_${te.id}',this.value)"
-          onkeydown="if(event.key==='Enter')this.blur()"
-          onclick="event.stopPropagation()">
+          onblur="saveEvMemo('te_${te.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()" onclick="event.stopPropagation()">
       </div>`;
     });
     html+=`</div>`;
   }
 
-  if(state.projFilter){
-    const p=proj(state.projFilter);
-    const evs=data.projEvents.filter(e=>e.projectId===state.projFilter).sort((a,b)=>a.date.localeCompare(b.date));
+  if(filteredProjEvs.length>0){
+    const p=hasProjFilter?proj(hasProjFilter):null;
+    const sortedEvs=filteredProjEvs.sort((a,b)=>a.date.localeCompare(b.date));
     html+=`<div class="card" style="overflow:hidden">
       <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px">
-        <span style="width:10px;height:10px;border-radius:50%;background:${p.color};display:inline-block"></span>${escH(p.name)} 전체 일정
-        <span style="font-size:11px;color:var(--text3);font-weight:400;margin-left:auto">${evs.length}개</span>
+        ${p?`<span style="width:10px;height:10px;border-radius:50%;background:${p.color};display:inline-block"></span>${escH(p.name)}`:'📁 Projects'} 전체 일정
+        <span style="font-size:11px;color:var(--text3);font-weight:400;margin-left:auto">${sortedEvs.length}개</span>
       </div>`;
-    if(evs.length===0)html+=`<div class="empty">No events</div>`;
-    else evs.forEach(ev=>{
+    sortedEvs.forEach(ev=>{
+      const pr=proj(ev.projectId);
       const memoKey=`ev_memo_${ev.id}`;
       const memoVal=data.classMemos[memoKey]||ev.note||'';
       html+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid var(--border)">
         <div style="cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:0" onclick="openEditItem('proj','${ev.id}')">
           <span style="font-size:11px;color:var(--text3);width:76px;flex-shrink:0">${ev.date}</span>
+          ${!hasProjFilter?`<span style="font-size:10px;color:${pr.color};flex-shrink:0;width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pr.name}</span>`:''}
           <span style="font-size:13px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(ev.title)}</span>
         </div>
         <input type="text" value="${escH(memoVal)}" placeholder="메모..."
           style="flex:1;min-width:0;padding:4px 10px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font);margin-left:8px"
-          onblur="saveEvMemo('${ev.id}',this.value)"
-          onkeydown="if(event.key==='Enter')this.blur()"
-          onclick="event.stopPropagation()">
+          onblur="saveEvMemo('${ev.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()" onclick="event.stopPropagation()">
       </div>`;
     });
     html+=`</div>`;
@@ -1293,6 +1310,99 @@ function setBlockCol(i,name){
   renderDay();
 }
 function saveBlock(ds,h,pid,val){if(!window.dayBlocks[ds])window.dayBlocks[ds]={};const key=`${h}_${pid}`;if(val.trim()==='')delete window.dayBlocks[ds][key];else window.dayBlocks[ds][key]=val.trim();renderDay();}
+// ── HAEGOBJ ──────────────────────────────────────────────
+function renderHaegobj(){
+  const todS=todayStr();
+  // cursor 기준 월요일 찾기
+  const base=new Date(state.cursor);
+  const dow=base.getDay();
+  const diffToMon=dow===0?-6:1-dow;
+  base.setDate(base.getDate()+diffToMon);
+
+  // 3주 = 21일
+  const weeks=[];
+  for(let w=0;w<3;w++){
+    const weekDays=[];
+    for(let d=0;d<7;d++){
+      const day=new Date(base);
+      day.setDate(base.getDate()+w*7+d);
+      weekDays.push(fmtDate(day));
+    }
+    weeks.push(weekDays);
+  }
+
+  const startLabel=`${parseDate(weeks[0][0]).getMonth()+1}월 ${parseDate(weeks[0][0]).getDate()}일`;
+  const endLabel=`${parseDate(weeks[2][6]).getMonth()+1}월 ${parseDate(weeks[2][6]).getDate()}일`;
+
+  let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <button onclick="navigate(-1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">‹</button>
+    <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <button onclick="navigate(1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">›</button>
+    <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${startLabel} — ${endLabel}</span>
+  </div>`;
+
+  // 요일 헤더
+  html+=`<div class="card" style="overflow:hidden">
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);background:var(--surface2);border-bottom:1px solid var(--border)">
+      ${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d,i)=>`
+        <div style="padding:6px 4px;text-align:center;font-size:11px;font-weight:600;font-family:var(--font-ui);color:${i===5?'var(--accent)':i===6?'var(--red)':'var(--text3)'}">${d}</div>
+      `).join('')}
+    </div>`;
+
+  // 3주 그리드
+  weeks.forEach((week,wi)=>{
+    // 주 구분선
+    if(wi>0)html+=`<div style="height:1px;background:var(--border)"></div>`;
+
+    html+=`<div style="display:grid;grid-template-columns:repeat(7,1fr)">`;
+    week.forEach((ds,di)=>{
+      const d=parseDate(ds);
+      const isToday=ds===todS;
+      const isHol=isHoliday(ds);
+      const dow=d.getDay();
+      const isSat=dow===6,isSun=dow===0;
+      const numColor=isHol||isSun?'var(--red)':isSat?'var(--accent)':'var(--text2)';
+      const memo=data.haegobjMemos[ds]||'';
+      const borderR=di<6?'border-right:1px solid var(--border);':'';
+
+      html+=`<div style="min-height:120px;padding:6px;${borderR}${isToday?'background:rgba(45,107,228,0.04);':''}display:flex;flex-direction:column;gap:4px">
+        <div style="font-size:11px;font-weight:${isToday?700:500};color:${isToday?'var(--accent)':numColor};display:flex;align-items:center;gap:4px;flex-shrink:0">
+          ${d.getDate()}
+          ${isToday?'<span style="font-size:9px;background:var(--accent);color:#fff;padding:0 4px;border-radius:6px">today</span>':''}
+          ${isHol?`<span style="font-size:9px;color:var(--red)">${holName(ds)}</span>`:''}
+        </div>
+        <textarea
+          id="hobj-${ds}"
+          placeholder="메모..."
+          style="flex:1;resize:none;border:1px solid transparent;border-radius:var(--radius-xs);padding:4px 6px;font-size:11px;font-family:var(--font);background:${memo?'var(--surface2)':'transparent'};color:var(--text);outline:none;line-height:1.5;min-height:80px;transition:all 0.1s"
+          onfocus="this.style.borderColor='var(--accent)';this.style.background='var(--bg)'"
+          onblur="this.style.borderColor='transparent';this.style.background=this.value?'var(--surface2)':'transparent';saveHaegobjMemo('${ds}',this.value)"
+          onkeydown="if(event.key==='Tab'){event.preventDefault();this.value+='	';}"
+        >${escH(memo)}</textarea>
+      </div>`;
+    });
+    html+=`</div>`;
+  });
+
+  html+=`</div>`;
+  document.getElementById('main-content').innerHTML=html;
+}
+
+let _haegobjTimer={};
+function saveHaegobjMemo(ds,val){
+  data.haegobjMemos[ds]=val;
+  clearTimeout(_haegobjTimer[ds]);
+  _haegobjTimer[ds]=setTimeout(async()=>{
+    setSyncing();
+    // class_memos 테이블 재활용 (project_id='haegobj', week=날짜hash)
+    const{error}=await sb.from('class_memos').upsert(
+      {user_id:currentUser.id,project_id:`haegobj_${ds}`,week:0,content:val},
+      {onConflict:'user_id,project_id,week'}
+    );
+    if(error)setSyncErr('Save Error');else setSynced();
+  },1000);
+}
+
 // ── Golf ──────────────────────────────────────────────────
 function renderGolf(){
   const yr=state.cursor.getFullYear(),mo=state.cursor.getMonth();
@@ -1810,9 +1920,10 @@ function openTravelModal(id){
 function closeTravelModal(){document.getElementById('travel-modal').style.display='none';}
 function renderTravelColors(){
   let h='';
-  PALETTE.forEach(c=>h+=`<div class="color-sw${c===_travelColor?' selected':''}" style="background:${c}" onclick="_travelColor='${c}';renderTravelColors()"></div>`);
+  PALETTE.forEach(c=>h+=`<div class="color-sw${c===_travelColor?' selected':''}" style="background:${c}" data-c="${c}" onclick="pickTravelColor(this.dataset.c)"></div>`);
   document.getElementById('travel-colors').innerHTML=h;
 }
+function pickTravelColor(c){_travelColor=c;renderTravelColors();}
 async function saveTravel(){
   const name=document.getElementById('travel-name').value.trim();
   const dest=document.getElementById('travel-dest').value.trim();
@@ -2036,90 +2147,144 @@ async function addDayTask(ds){
 // Todo Panel
 let _hideDone=false;
 function updateTpProj(){/* deprecated */}
+function todoPanelNav(dir){
+  const d=parseDate(state.todoPanelDate);
+  d.setDate(d.getDate()+dir);
+  state.todoPanelDate=fmtDate(d);
+  renderTodoPanel();
+}
+function todoPanelToday(){
+  state.todoPanelDate=todayStr();
+  renderTodoPanel();
+}
 function toggleTodos(){
   const p=document.getElementById('todo-panel');
   if(p.style.display==='none'||!p.style.display){
-    // proj select 채우기
-    const sel=document.getElementById('tp-proj-sel');
-    if(sel)sel.innerHTML='<option value="">No project</option>'+data.projects.map(pr=>`<option value="${pr.id}">${escH(pr.name)}</option>`).join('');
-    // 날짜 오늘로
-    const dateEl=document.getElementById('tp-date');
-    if(dateEl&&!dateEl.value)dateEl.value=todayStr();
-    renderTodoPanel();p.style.display='flex';
+    state.todoPanelDate=todayStr();
+    renderTodoPanel();
+    p.style.display='flex';
     pushUiState('todo-panel');
   }else p.style.display='none';
 }
 function closeTodoPanel(){document.getElementById('todo-panel').style.display='none';}
 function toggleHideDone(){_hideDone=!_hideDone;document.getElementById('hide-done-btn').textContent=_hideDone?'Show Done':'Hide Done';renderTodoPanel();}
 function renderTodoPanel(){
-  // 날짜별로 그룹핑 (독립 task + 세부항목 모두)
-  const allDates=new Set();
-  data.tasks.forEach(t=>{if(t.date)allDates.add(t.date);});
-  // 날짜 없는 것도 포함
-  const hasNoDate=data.tasks.some(t=>!t.date&&!t.eventId);
-  const sortedDates=[...allDates].sort();
-
-  let h='';
-
-  // 날짜별 섹션
-  sortedDates.forEach(ds=>{
-    const dayIndep=data.tasks.filter(t=>t.date===ds&&!t.eventId&&(!_hideDone||!t.done));
-    // 이 날짜에 연결된 proj event의 세부항목
-    const dayEvIds=new Set(data.projEvents.filter(e=>e.date===ds).map(e=>e.id));
-    const daySubs=data.tasks.filter(t=>t.date===ds&&t.eventId&&(!_hideDone||!t.done));
-
-    if(dayIndep.length===0&&daySubs.length===0)return;
-
-    const d=parseDate(ds);
-    const isToday=ds===todayStr();
-    h+=`<div style="padding:5px 14px 2px;font-size:11px;font-weight:600;background:var(--surface2);display:flex;align-items:center;justify-content:space-between">
-      <span style="color:${isToday?'var(--accent)':'var(--text3)'}">${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일${isToday?' (오늘)':''}</span>
-    </div>`;
-
-    // 독립 tasks
-    dayIndep.forEach(td=>{
-      const p=proj(td.projectId),c=p.color||'#999';
-      const subs=data.tasks.filter(s=>s.eventId===td.id);
-      h+=`<div class="todo-item" style="flex-direction:column;align-items:flex-start;gap:0;padding:6px 14px;border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:center;gap:7px;width:100%">
-          <input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked)">
-          <span class="todo-txt${td.done?' done':''}" style="flex:1">${escH(td.title)}</span>
-          ${p.name?`<span style="font-size:10px;color:${c};flex-shrink:0">${p.name}</span>`:''}
-          <button class="todo-del" onclick="deleteTask('${td.id}')">✕</button>
-        </div>
-      </div>`;
-    });
-
-    // 세부항목 (proj event 소속)
-    daySubs.forEach(td=>{
-      const ev=data.projEvents.find(e=>e.id===td.eventId);
-      const evColor=ev?proj(ev.projectId).color||'#4472C4':'#999';
-      h+=`<div class="todo-item" style="padding:4px 14px 4px 28px;border-bottom:1px solid var(--border)">
-        <input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked)">
-        <span class="todo-txt${td.done?' done':''}" style="flex:1;font-size:12px">${escH(td.title)}</span>
-        ${ev?`<span style="font-size:10px;color:${evColor};flex-shrink:0">${escH(ev.title)}</span>`:''}
-        <input type="date" value="${td.date||''}" title="날짜 변경"
-          style="width:110px;padding:1px 4px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:10px;background:var(--bg);color:var(--text);outline:none;margin-left:4px"
-          onchange="changeSubDate('${td.id}',this.value)">
-        <button class="todo-del" onclick="deleteTask('${td.id}')">✕</button>
-      </div>`;
-    });
+  const baseDate=parseDate(state.todoPanelDate);
+  // 3일치 날짜 생성
+  const days=[-1,0,1].map(i=>{
+    const d=new Date(baseDate);d.setDate(d.getDate()+i);return fmtDate(d);
   });
 
-  // 날짜 없는 독립 tasks
-  if(hasNoDate){
-    const noDateTasks=data.tasks.filter(t=>!t.date&&!t.eventId&&(!_hideDone||!t.done));
-    if(noDateTasks.length>0){
-      h+=`<div style="padding:5px 14px 2px;font-size:11px;font-weight:600;color:var(--text3);background:var(--surface2)">날짜 없음</div>`;
-      noDateTasks.forEach(td=>{
-        h+=`<div class="todo-item"><input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked)"><span class="todo-txt${td.done?' done':''}" style="flex:1">${escH(td.title)}</span><button class="todo-del" onclick="deleteTask('${td.id}')">✕</button></div>`;
-      });
-    }
-  }
+  const todS=todayStr();
+  let html='';
 
-  if(!h)h=`<div class="empty">No tasks 🎉</div>`;
-  document.getElementById('todo-panel-body').innerHTML=h;
+  days.forEach((ds,di)=>{
+    const d=parseDate(ds);
+    const isToday=ds===todS;
+    const dow=['일','월','화','수','목','금','토'][d.getDay()];
+    const dayLabel=`${d.getMonth()+1}월 ${d.getDate()}일 (${dow})`;
+
+    // 이날의 독립 tasks
+    const dayTasks=data.tasks.filter(t=>t.date===ds&&!t.eventId&&(!_hideDone||!t.done));
+    // 이날의 proj events와 세부항목
+    const dayPevs=data.projEvents.filter(e=>e.date===ds);
+    const daySubsByEv={};
+    dayPevs.forEach(ev=>{
+      const subs=data.tasks.filter(t=>t.eventId===ev.id&&(!_hideDone||!t.done));
+      if(subs.length>0||!_hideDone)daySubsByEv[ev.id]=subs;
+    });
+
+    const borderL=di>0?'border-left:1px solid var(--border);':'';
+    const bgCol=isToday?'background:rgba(45,107,228,0.03);':'';
+
+    html+=`<div style="flex:1;min-width:0;display:flex;flex-direction:column;${borderL}${bgCol}">
+      <!-- 날짜 헤더 -->
+      <div style="padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:6px;background:${isToday?'var(--accent-bg)':'var(--surface2)'}">
+        <span style="font-size:12px;font-weight:600;color:${isToday?'var(--accent)':'var(--text2)'}">${dayLabel}</span>
+        ${isToday?'<span style="font-size:10px;background:var(--accent);color:#fff;padding:1px 6px;border-radius:8px">오늘</span>':''}
+        <button onclick="openAddTaskModal('${ds}')" style="margin-left:auto;background:none;border:1px solid var(--border2);border-radius:var(--radius-xs);padding:1px 7px;cursor:pointer;font-size:14px;color:var(--text3)">+</button>
+      </div>
+      <!-- 태스크 목록 -->
+      <div style="flex:1;overflow-y:auto;padding:6px 0">`;
+
+    // proj event 세부항목
+    dayPevs.forEach(ev=>{
+      const subs=daySubsByEv[ev.id];
+      if(subs===undefined)return;
+      const p=proj(ev.projectId),c=p.color||'#4472C4';
+      html+=`<div style="margin:4px 8px;border-radius:var(--radius-xs);background:${evBg(c)};overflow:hidden">
+        <div style="padding:5px 8px;font-size:11px;font-weight:600;color:${evTxt(c)};cursor:pointer;display:flex;align-items:center;gap:5px" onclick="openEditItem('proj','${ev.id}')">
+          <span style="width:5px;height:5px;border-radius:50%;background:${c};display:inline-block;flex-shrink:0"></span>
+          ${escH(ev.title)}
+        </div>`;
+      subs.forEach(td=>{
+        html+=`<div style="display:flex;align-items:center;gap:6px;padding:3px 8px 3px 16px;background:var(--surface);border-top:1px solid ${evBg(c)}">
+          <input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked);renderTodoPanel()">
+          <span style="flex:1;font-size:12px;${td.done?'text-decoration:line-through;color:var(--text3)':''}">${escH(td.title)}</span>
+          <button class="todo-del" onclick="deleteTask('${td.id}');renderTodoPanel()">✕</button>
+        </div>`;
+      });
+      html+=`<div style="padding:3px 8px 5px 16px;background:var(--surface)">
+        <input type="text" placeholder="+ 세부항목..." style="width:100%;border:none;background:transparent;font-size:11px;color:var(--text2);outline:none;font-family:var(--font)"
+          onkeydown="if(event.key==='Enter')addLinkedTask('${ev.id}','${ds}','${ev.projectId||''}',this);if(event.key==='Enter')renderTodoPanel()">
+      </div></div>`;
+    });
+
+    // 독립 tasks
+    if(dayTasks.length>0){
+      html+=`<div style="margin:4px 8px;border-radius:var(--radius-xs);overflow:hidden;border:1px solid var(--border)">`;
+      dayTasks.forEach(td=>{
+        const p=proj(td.projectId),c=p.color||'#999';
+        const subs=data.tasks.filter(s=>s.eventId===td.id);
+        html+=`<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--border);background:var(--surface)">
+          <input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked);renderTodoPanel()">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;${td.done?'text-decoration:line-through;color:var(--text3)':''}">${escH(td.title)}</div>
+            ${p.name?`<div style="font-size:10px;color:${c}">${p.name}</div>`:''}
+            ${subs.length>0?`<div style="font-size:10px;color:var(--text3)">${subs.filter(s=>s.done).length}/${subs.length} done</div>`:''}
+          </div>
+          <button class="todo-del" onclick="deleteTask('${td.id}');renderTodoPanel()">✕</button>
+        </div>`;
+      });
+      html+=`</div>`;
+    }
+
+    if(dayTasks.length===0&&dayPevs.length===0){
+      html+=`<div style="padding:20px 12px;text-align:center;font-size:12px;color:var(--text3)">No tasks</div>`;
+    }
+
+    // 빠른 추가
+    html+=`</div>
+      <div style="padding:8px;border-top:1px solid var(--border);flex-shrink:0">
+        <div style="display:flex;gap:5px;margin-bottom:5px">
+          <input type="text" placeholder="Add task..." id="tp-inp-${ds}"
+            style="flex:1;padding:5px 8px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font)"
+            onkeydown="if(event.key==='Enter')addDayTodoPanel('${ds}',this)">
+          <button onclick="addDayTodoPanel('${ds}',document.getElementById('tp-inp-${ds}'))"
+            style="padding:5px 10px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-xs);cursor:pointer;font-size:14px">+</button>
+        </div>
+        <select id="tp-proj-${ds}" style="width:100%;padding:3px 6px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:11px;background:var(--bg);color:var(--text);outline:none">
+          <option value="">No project</option>
+          ${data.projects.map(pr=>`<option value="${pr.id}">${escH(pr.name)}</option>`).join('')}
+        </select>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('todo-panel-body').innerHTML=html;
 }
+
+async function addDayTodoPanel(ds,inp){
+  const title=inp.value.trim();if(!title)return;
+  const sel=document.getElementById(`tp-proj-${ds}`);
+  const pid=sel?sel.value:'';
+  const td={id:makeId(),title,date:ds,projectId:pid,done:false,eventId:''};
+  data.tasks.push(td);
+  inp.value='';
+  renderTodoPanel();renderAll();
+  await saveTask(td);
+}
+
 
 async function changeSubDate(id,newDate){
   const td=data.tasks.find(t=>t.id===id);if(!td)return;
@@ -2129,15 +2294,7 @@ async function changeSubDate(id,newDate){
   const err=await saveTask(td);
   if(err){td.date=old;renderTodoPanel();}
 }
-async function addPanelTodo(){
-  const inp=document.getElementById('tp-inp');
-  const title=inp.value.trim();if(!title)return;
-  const date=document.getElementById('tp-date')?.value||todayStr();
-  const pid=document.getElementById('tp-proj-sel')?.value||'';
-  const td={id:makeId(),title,date,projectId:pid,done:false,eventId:''};
-  data.tasks.push(td);inp.value='';renderAll();renderTodoPanel();
-  await saveTask(td);
-}
+async function addPanelTodo(){/* replaced by addDayTodoPanel */}
 
 // ── Projects ──────────────────────────────────────────────
 let _newProjColor=PALETTE[0];
