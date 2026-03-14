@@ -751,7 +751,7 @@ async function signInWithGoogle() {
   document.getElementById('login-loading').textContent = '로그인 중...';
   const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: 'https://delicate-salmiakki-c62543.netlify.app' }
+    options: { redirectTo: 'https://jinhae-schedule.github.io/schedule/' }
   });
   if (error) { document.getElementById('login-loading').textContent = '오류: ' + error.message; }
 }
