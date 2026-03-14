@@ -297,7 +297,8 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
       <div class="nav-div"></div>
 
       <div class="nav-sec">
-        <div class="nav-lbl">Tasks<button class="nav-lbl-btn" onclick="toggleTodos()">☰</button></div>
+        <div class="nav-lbl">Tasks</div>
+        <button class="nav-btn" data-view="tasks" onclick="setView('tasks')"><span class="nav-icon">📋</span>Task Calendar</button>
         <button class="nav-btn" onclick="toggleTodos()"><span class="nav-icon">✓</span>Todo List</button>
       </div>
       <div class="nav-div"></div>
@@ -393,16 +394,17 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
     </div>
   </div>
   <div style="flex:1;overflow-y:auto" id="todo-panel-body"></div>
-  <div class="quick-add" style="border-top:1px solid var(--border)">
-    <select id="tp-type-sel" style="padding:6px 8px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;max-width:100px" onchange="updateTpProj()">
-      <option value="proj">Project</option>
-      <option value="timed">Timed</option>
-    </select>
-    <select id="tp-proj-sel" style="padding:6px 8px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;max-width:120px">
-      <option value="">None</option>
-    </select>
-    <input type="text" id="tp-inp" placeholder="Add task..." onkeydown="if(event.key==='Enter')addPanelTodo()" style="flex:1">
-    <button onclick="addPanelTodo()">+</button>
+  <div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px">
+    <div style="display:flex;gap:6px">
+      <input type="text" id="tp-inp" placeholder="Add task..." onkeydown="if(event.key==='Enter')addPanelTodo()" style="flex:1;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:13px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font)">
+      <button onclick="addPanelTodo()" style="padding:6px 12px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-xs);cursor:pointer;font-size:16px">+</button>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <input type="date" id="tp-date" value="${todayStr()}" style="padding:4px 6px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:11px;background:var(--bg);color:var(--text);outline:none">
+      <select id="tp-proj-sel" style="flex:1;padding:4px 6px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:11px;background:var(--bg);color:var(--text);outline:none">
+        <option value="">No project</option>
+      </select>
+    </div>
   </div>
 </div>
 </div>
@@ -795,8 +797,8 @@ function setView(v){
 function navigate(dir){
   const c=state.cursor;
   if(['day'].includes(state.view))c.setDate(c.getDate()+dir);
-  else if(['month','studio','golf','period'].includes(state.view))c.setMonth(c.getMonth()+dir);
-  else if(['year','travel'].includes(state.view))c.setFullYear(c.getFullYear()+dir);
+  else if(['month','studio','golf','period','filtered','travel','tasks'].includes(state.view))c.setMonth(c.getMonth()+dir);
+  else if(['year'].includes(state.view))c.setFullYear(c.getFullYear()+dir);
   state.cursor=new Date(c);renderAll();
 }
 function goToday(){state.cursor=new Date(today);state.selected=todayStr();renderAll();}
@@ -804,8 +806,11 @@ function selectDay(ds){state.selected=ds;state.cursor=parseDate(ds);renderAll();
 function jumpToDay(ds){state.selected=ds;state.cursor=parseDate(ds);setView('day');}
 function setProjFilter(pid){
   state.projFilter=pid;
-  if(pid)state.timedFilter=null; // 동시 필터 방지
-  if(pid&&['golf','studio','period','day','travel'].includes(state.view)){
+  if(pid)state.timedFilter=null;
+  if(pid){
+    state.view='filtered';
+    document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.remove('active'));
+  } else {
     state.view='month';
     document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='month'));
   }
@@ -814,8 +819,11 @@ function setProjFilter(pid){
 }
 function setTimedFilter(id){
   state.timedFilter=id;
-  if(id)state.projFilter=null; // 동시 필터 방지
-  if(id&&['golf','studio','period','day','travel'].includes(state.view)){
+  if(id)state.projFilter=null;
+  if(id){
+    state.view='filtered';
+    document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.remove('active'));
+  } else {
     state.view='month';
     document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view==='month'));
   }
@@ -837,12 +845,12 @@ function closeSb(){document.getElementById('sidebar').classList.remove('open');d
 function renderAll(){
   if(!currentUser)return;
   updateTitle();renderSidebar();renderFilterBar();
-  const views={home:renderHome,year:renderYear,month:renderMonth,day:renderDay,golf:renderGolf,studio:renderStudio,period:renderPeriod,travel:renderTravel};
+  const views={home:renderHome,year:renderYear,month:renderMonth,filtered:renderFiltered,tasks:renderTaskCal,day:renderDay,golf:renderGolf,studio:renderStudio,period:renderPeriod,travel:renderTravel};
   (views[state.view]||renderHome)();
 }
 function updateTitle(){
   const c=state.cursor;
-  const titles={home:'🏠 Home',year:c.getFullYear()+'년',travel:'✈️ Travel — '+c.getFullYear()+'년',month:c.getFullYear()+'년 '+(c.getMonth()+1)+'월',day:c.getFullYear()+'년 '+(c.getMonth()+1)+'월 '+c.getDate()+'일 ('+['일','월','화','수','목','금','토'][c.getDay()]+')',golf:'⛳ Golf — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',studio:'🏢 Studio — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',period:'🌸 Period — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월'};
+  const titles={home:'🏠 Home',year:c.getFullYear()+'년',filtered:'',tasks:'📋 Tasks — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',travel:'✈️ Travel — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',month:c.getFullYear()+'년 '+(c.getMonth()+1)+'월',day:c.getFullYear()+'년 '+(c.getMonth()+1)+'월 '+c.getDate()+'일 ('+['일','월','화','수','목','금','토'][c.getDay()]+')',golf:'⛳ Golf — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',studio:'🏢 Studio — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',period:'🌸 Period — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월'};
   document.getElementById('main-title').textContent=titles[state.view]||'';
 }
 function renderSidebar(){
@@ -951,8 +959,7 @@ function renderMonth(){
     <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
     <button onclick="navigate(1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">›</button>
     <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월~</span>
-    ${state.projFilter?`<span class="filter-chip" style="background:${proj(state.projFilter).color}">${escH(proj(state.projFilter).name)}</span><button onclick="setProjFilter(null)" class="btn-cancel" style="font-size:11px;padding:2px 8px;border-radius:12px">✕</button>`:''}
-    ${state.timedFilter?`<span class="filter-chip" style="background:${timedCat(state.timedFilter).color}">${escH(timedCat(state.timedFilter).name)}</span><button onclick="setTimedFilter(null)" class="btn-cancel" style="font-size:11px;padding:2px 8px;border-radius:12px">✕</button>`:''}
+
   </div>`;
 
   // 현재 달 기준 앞뒤로 보여줄 달 범위: 현재달 + 이후 2달 (총 3달 연속)
@@ -1001,26 +1008,86 @@ function renderMonth(){
       html+=`<div class="month-cell-num" style="${numColor}${cellBg&&!cell.other?`color:${cellBg};font-weight:700;`:''}">
         <span>${cell.date.getDate()}</span>${cellBg&&!cell.other?`<span class="cell-dot" style="background:${cellBg}"></span>`:''}${lbls}
       </div>`;
-      if(!state.projFilter){
-        timedEventsOn(ds).forEach(te=>{const cat=timedCat(te.categoryId),c=cat.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)};display:flex;gap:2px" onclick="event.stopPropagation();openEditItem('timed','${te.id}')"><span style="opacity:.75;font-size:9px;flex-shrink:0">${te.time}</span><span style="overflow:hidden;text-overflow:ellipsis">${escH(te.title)}</span></div>`;});
-      }
-      if(!state.timedFilter){
-        projEventsOn(ds).forEach(ev=>{const p=proj(ev.projectId),c=p.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}" onclick="event.stopPropagation();openEditItem('proj','${ev.id}')">${escH(ev.title)}</div>`;});
-        tasksOn(ds,true).forEach(td=>{const p=proj(td.projectId),c=p.color||'#999';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}">${td.done?'✓ ':''}${escH(td.title)}</div>`;});
-      }
+      // 전체 표시 (Timed + Project + Task + Travel)
+      data.timedEvents.filter(t=>t.date===ds).sort((a,b)=>a.time.localeCompare(b.time)).forEach(te=>{const cat=timedCat(te.categoryId),c=cat.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)};display:flex;gap:2px" onclick="event.stopPropagation();openEditItem('timed','${te.id}')"><span style="opacity:.75;font-size:9px;flex-shrink:0">${te.time}</span><span style="overflow:hidden;text-overflow:ellipsis">${escH(te.title)}</span></div>`;});
+      data.projEvents.filter(e=>e.date===ds).forEach(ev=>{const p=proj(ev.projectId),c=p.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}" onclick="event.stopPropagation();openEditItem('proj','${ev.id}')">${escH(ev.title)}</div>`;});
+      data.tasks.filter(t=>t.date===ds&&!t.eventId).forEach(td=>{const p=proj(td.projectId),c=p.color||'#999';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}">${td.done?'✓ ':''}${escH(td.title)}</div>`;});
+      data.travels.filter(t=>t.startDate<=ds&&t.endDate>=ds).forEach(t=>{html+=`<div class="month-ev" style="background:${evBg(t.color)};color:${evTxt(t.color)}" onclick="event.stopPropagation();setView('travel')">✈️ ${escH(t.name)}</div>`;});
       html+=`</div>`;
     });
     html+=`</div></div></div>`;
   });
 
-  // 필터별 통합 일정 목록
+    document.getElementById('main-content').innerHTML=html;
+}
+
+// ── Filtered View (프로젝트/타임드 개별) ─────────────────────
+function renderFiltered(){
+  const yr=state.cursor.getFullYear(),mo=state.cursor.getMonth();
+  const todS=todayStr();
+
+  // 헤더
+  let label='',color='#4472C4',emoji='';
+  if(state.projFilter){const p=proj(state.projFilter);label=p.name;color=p.color;}
+  if(state.timedFilter){const c=timedCat(state.timedFilter);label=c.name;color=c.color;emoji=c.emoji||'';}
+
+  let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <button onclick="navigate(-1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">‹</button>
+    <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <button onclick="navigate(1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">›</button>
+    <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월</span>
+    <span class="filter-chip" style="background:${color}">${emoji?emoji+' ':''}${escH(label)}</span>
+    <button onclick="${state.projFilter?'setProjFilter(null)':'setTimedFilter(null)'}" class="btn-cancel" style="font-size:11px;padding:2px 8px;border-radius:12px">✕ 전체보기</button>
+  </div>`;
+
+  // 단일 달력
+  const first=new Date(yr,mo,1),last=new Date(yr,mo+1,0);
+  const offset=(first.getDay()||7)-1;
+  html+=`<div class="card month-view" style="margin-bottom:14px"><div class="month-hdr">`;
+  ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach((d,i)=>html+=`<div class="month-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`);
+  html+=`</div><div class="month-grid">`;
+
+  let cells=[];
+  for(let i=0;i<offset;i++){let d=new Date(yr,mo,1-offset+i);cells.push({date:d,other:true});}
+  for(let i=1;i<=last.getDate();i++)cells.push({date:new Date(yr,mo,i),other:false});
+  const rem=7-(cells.length%7);if(rem<7)for(let i=1;i<=rem;i++)cells.push({date:new Date(yr,mo+1,i),other:true});
+
+  cells.forEach(cell=>{
+    const ds=fmtDate(cell.date),isT=ds===todS,isSel=ds===state.selected;
+    const dow=cell.date.getDay(),di=dow===0?6:dow-1;
+    const hol=!cell.other?holName(ds):'';
+    const annivs=!cell.other?getAnnivs(ds):[];
+    const numColor=hol?'color:var(--red)':di===5?'color:var(--accent)':di===6?'color:var(--red)':'';
+    const cellBg=!cell.other&&data.cellColors[ds]?data.cellColors[ds]:'';
+    html+=`<div class="month-cell${cell.other?' other':''}${isT?' today':''}${isSel?' selected':''}" style="${cellBg?`background:${cellBg}1A;`:''}"
+      onclick="selectDay('${ds}')"
+      oncontextmenu="event.preventDefault();${!cell.other?`openCellColorPicker('${ds}',event)`:''}">`;
+    let lbls='';
+    if(!cell.other){
+      if(hol)lbls+=`<span style="font-size:9px;color:var(--red);font-weight:500;margin-left:3px">${hol}</span>`;
+      annivs.forEach(a=>lbls+=`<span style="font-size:9px;color:var(--accent);font-weight:500;margin-left:3px">${a.emoji||''}${a.name}</span>`);
+    }
+    html+=`<div class="month-cell-num" style="${numColor}">
+      <span>${cell.date.getDate()}</span>${lbls}
+    </div>`;
+    // 해당 필터 항목만 표시
+    if(state.timedFilter){
+      timedEventsOn(ds).forEach(te=>{const cat=timedCat(te.categoryId),c=cat.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)};display:flex;gap:2px" onclick="event.stopPropagation();openEditItem('timed','${te.id}')"><span style="opacity:.75;font-size:9px;flex-shrink:0">${te.time}</span><span style="overflow:hidden;text-overflow:ellipsis">${escH(te.title)}</span></div>`;});
+    }
+    if(state.projFilter){
+      projEventsOn(ds).forEach(ev=>{const p=proj(ev.projectId),c=p.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}" onclick="event.stopPropagation();openEditItem('proj','${ev.id}')">${escH(ev.title)}</div>`;});
+    }
+    html+=`</div>`;
+  });
+  html+=`</div></div>`;
+
+  // 통합 일정 목록
   if(state.timedFilter){
     const cat=timedCat(state.timedFilter);
-    const curYr=yr;
-    const tes=data.timedEvents.filter(t=>t.categoryId===state.timedFilter&&t.date.startsWith(curYr+'')).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
-    html+=`<div class="card" style="margin-top:14px;overflow:hidden">
+    const tes=data.timedEvents.filter(t=>t.categoryId===state.timedFilter).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+    html+=`<div class="card" style="overflow:hidden">
       <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px">
-        <span style="width:10px;height:10px;border-radius:50%;background:${cat.color};display:inline-block"></span>${cat.emoji?cat.emoji+' ':''}${escH(cat.name)} ${curYr}년 일정
+        <span style="width:10px;height:10px;border-radius:50%;background:${cat.color};display:inline-block"></span>${cat.emoji?cat.emoji+' ':''}${escH(cat.name)} 전체 일정
         <span style="font-size:11px;color:var(--text3);font-weight:400;margin-left:auto">${tes.length}개</span>
       </div>`;
     if(tes.length===0)html+=`<div class="empty">No events</div>`;
@@ -1031,7 +1098,7 @@ function renderMonth(){
         <div style="cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0" onclick="openEditItem('timed','${te.id}')">
           <span style="font-size:11px;color:var(--text3);width:76px;flex-shrink:0">${te.date}</span>
           <span style="font-size:11px;font-weight:600;color:${cat.color};width:36px;flex-shrink:0">${te.time}</span>
-          <span style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px">${escH(te.title)}</span>
+          <span style="font-size:13px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(te.title)}</span>
         </div>
         <input type="text" value="${escH(memoVal)}" placeholder="메모..."
           style="flex:1;min-width:0;padding:4px 10px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font);margin-left:8px"
@@ -1046,7 +1113,7 @@ function renderMonth(){
   if(state.projFilter){
     const p=proj(state.projFilter);
     const evs=data.projEvents.filter(e=>e.projectId===state.projFilter).sort((a,b)=>a.date.localeCompare(b.date));
-    html+=`<div class="card" style="margin-top:14px;overflow:hidden">
+    html+=`<div class="card" style="overflow:hidden">
       <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px">
         <span style="width:10px;height:10px;border-radius:50%;background:${p.color};display:inline-block"></span>${escH(p.name)} 전체 일정
         <span style="font-size:11px;color:var(--text3);font-weight:400;margin-left:auto">${evs.length}개</span>
@@ -1058,7 +1125,7 @@ function renderMonth(){
       html+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid var(--border)">
         <div style="cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:0" onclick="openEditItem('proj','${ev.id}')">
           <span style="font-size:11px;color:var(--text3);width:76px;flex-shrink:0">${ev.date}</span>
-          <span style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px">${escH(ev.title)}</span>
+          <span style="font-size:13px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(ev.title)}</span>
         </div>
         <input type="text" value="${escH(memoVal)}" placeholder="메모..."
           style="flex:1;min-width:0;padding:4px 10px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font);margin-left:8px"
@@ -1072,6 +1139,7 @@ function renderMonth(){
 
   document.getElementById('main-content').innerHTML=html;
 }
+
 
 // ── Year ──────────────────────────────────────────────────
 function renderYear(){
@@ -1536,53 +1604,168 @@ async function togglePeriod(ds){
   }
 }
 async function delPeriodEntry(id){data.periodLogs=data.periodLogs.filter(p=>p.id!==id);renderPeriod();await delPeriodLog(id);}
+// ── Task Calendar ────────────────────────────────────────
+function renderTaskCal(){
+  const yr=state.cursor.getFullYear(),mo=state.cursor.getMonth();
+  const todS=todayStr();
+  const first=new Date(yr,mo,1),last=new Date(yr,mo+1,0);
+  const offset=(first.getDay()||7)-1;
+
+  let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <button onclick="navigate(-1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">‹</button>
+    <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <button onclick="navigate(1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">›</button>
+    <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월</span>
+  </div>`;
+
+  html+=`<div class="card month-view" style="margin-bottom:14px"><div class="month-hdr">`;
+  ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach((d,i)=>html+=`<div class="month-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`);
+  html+=`</div><div class="month-grid">`;
+
+  let cells=[];
+  for(let i=0;i<offset;i++){let d=new Date(yr,mo,1-offset+i);cells.push({date:d,other:true});}
+  for(let i=1;i<=last.getDate();i++)cells.push({date:new Date(yr,mo,i),other:false});
+  const rem=7-(cells.length%7);if(rem<7)for(let i=1;i<=rem;i++)cells.push({date:new Date(yr,mo+1,i),other:true});
+
+  cells.forEach(cell=>{
+    const ds=fmtDate(cell.date),isT=ds===todS;
+    const dow=cell.date.getDay(),di=dow===0?6:dow-1;
+    const hol=!cell.other?holName(ds):'';
+    const numColor=hol?'color:var(--red)':di===5?'color:var(--accent)':di===6?'color:var(--red)':'';
+    const dayTasks=!cell.other?data.tasks.filter(t=>t.date===ds&&!t.eventId):[];
+    html+=`<div class="month-cell${cell.other?' other':''}${isT?' today':''}"
+      onclick="${!cell.other?`openAddTaskModal('${ds}')`:''}"
+      oncontextmenu="event.preventDefault()">`;
+    html+=`<div class="month-cell-num" style="${numColor}"><span>${cell.date.getDate()}</span>${hol?`<span style="font-size:9px;color:var(--red);margin-left:3px">${hol}</span>`:''}</div>`;
+    dayTasks.forEach(td=>{
+      const p=proj(td.projectId),c=p.color||'#999';
+      html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)};display:flex;align-items:center;gap:3px" onclick="event.stopPropagation();openEditTaskModal('${td.id}')">
+        ${td.done?'<span style="opacity:.5;text-decoration:line-through">':''}${escH(td.title)}${td.done?'</span>':''}
+      </div>`;
+    });
+    html+=`</div>`;
+  });
+  html+=`</div></div>`;
+
+  // 이달 Task 목록
+  const monthTasks=data.tasks.filter(t=>!t.eventId&&t.date&&t.date.startsWith(`${yr}-${String(mo+1).padStart(2,'0')}`)).sort((a,b)=>a.date.localeCompare(b.date));
+  const doneCnt=monthTasks.filter(t=>t.done).length;
+
+  html+=`<div class="card" style="overflow:hidden">
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between">
+      ${yr}년 ${mo+1}월 Tasks
+      <span style="font-size:11px;color:var(--text3);font-weight:400">${doneCnt}/${monthTasks.length} done</span>
+    </div>`;
+  if(monthTasks.length===0){html+=`<div class="empty">No tasks this month</div>`;}
+  else{
+    // 날짜별 그룹
+    const byDate={};
+    monthTasks.forEach(t=>{if(!byDate[t.date])byDate[t.date]=[];byDate[t.date].push(t);});
+    Object.entries(byDate).sort().forEach(([ds,tds])=>{
+      const d=parseDate(ds);
+      html+=`<div style="padding:5px 14px 2px;font-size:11px;font-weight:600;color:var(--text3);background:var(--surface2)">${d.getMonth()+1}월 ${d.getDate()}일</div>`;
+      tds.forEach(td=>{
+        const p=proj(td.projectId),c=p.color||'#999';
+        const subs=data.tasks.filter(t=>t.eventId===td.id);
+        html+=`<div class="todo-item" style="border-bottom:1px solid var(--border)">
+          <input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked)">
+          <div style="flex:1;min-width:0">
+            <div class="todo-txt${td.done?' done':''}" style="cursor:pointer" onclick="openEditTaskModal('${td.id}')">${escH(td.title)}</div>
+            ${p.name?`<div style="font-size:10px;color:${c}">${p.name}</div>`:''}
+            ${subs.length>0?`<div style="font-size:10px;color:var(--text3);margin-top:1px">${subs.filter(s=>s.done).length}/${subs.length} subtasks</div>`:''}
+          </div>
+          <button class="todo-del" onclick="deleteTask('${td.id}')">✕</button>
+        </div>`;
+      });
+    });
+  }
+  html+=`</div>`;
+  document.getElementById('main-content').innerHTML=html;
+}
+
+function openAddTaskModal(ds){
+  _mMode='add';_mId=null;_mType='task';_mColor='';
+  document.getElementById('modal-title').textContent='Add Task';
+  document.getElementById('m-title').value='';
+  document.getElementById('m-date').value=ds||todayStr();
+  document.getElementById('m-note').value='';
+  document.getElementById('m-del-btn').style.display='none';
+  document.getElementById('m-subtasks-sec').style.display='none';
+  fillProjSelect('');
+  setModalType('task');
+  document.getElementById('modal').style.display='flex';
+  pushUiState('modal');
+  setTimeout(()=>document.getElementById('m-title').focus(),100);
+}
+
+function openEditTaskModal(id){
+  openEditItem('task',id);
+}
+
 // ── Travel ────────────────────────────────────────────────
 let _travelColor=PALETTE[0];
 let _editTravelId=null;
 
 function renderTravel(){
-  const yr=state.cursor.getFullYear();
-  const yearTravels=data.travels.filter(t=>{
-    const sy=parseInt(t.startDate.slice(0,4)),ey=parseInt(t.endDate.slice(0,4));
-    return sy<=yr&&ey>=yr;
-  }).sort((a,b)=>a.startDate.localeCompare(b.startDate));
+  const yr=state.cursor.getFullYear(),mo=state.cursor.getMonth();
+  const todS=todayStr();
 
-  let html=`<div style="display:flex;justify-content:flex-end;margin-bottom:10px">
-    <button class="btn-save" onclick="openTravelModal()" style="border-radius:20px;font-size:12px;padding:6px 16px">+ Add Travel</button>
+  // 달력
+  const first=new Date(yr,mo,1),last=new Date(yr,mo+1,0);
+  const offset=(first.getDay()||7)-1;
+
+  let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <button onclick="navigate(-1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">‹</button>
+    <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <button onclick="navigate(1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">›</button>
+    <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월</span>
+    <button onclick="openTravelModal()" class="btn-save" style="margin-left:auto;border-radius:20px;font-size:12px;padding:5px 14px">+ Add</button>
   </div>`;
 
-  // 연간 달력 (12개월 그리드)
-  html+=`<div class="year-view" style="margin-bottom:14px">`;
-  for(let mo=0;mo<12;mo++){
-    html+=`<div class="card" style="padding:10px"><div style="font-size:12px;font-weight:500;margin-bottom:7px">${MONTHS[mo]}</div><div class="year-mini">`;
-    ['M','T','W','T','F','S','S'].forEach((d,i)=>html+=`<div class="year-dow" style="${i===5?'color:var(--accent)':i===6?'color:var(--red)':''}">${d}</div>`);
-    const first=new Date(yr,mo,1),last=new Date(yr,mo+1,0);
-    const offset=(first.getDay()||7)-1;
-    for(let i=0;i<offset;i++)html+=`<div class="year-day other"></div>`;
-    for(let d=1;d<=last.getDate();d++){
-      const ds=ym(yr,mo,d),isT=ds===todayStr();
-      const dow=new Date(yr,mo,d).getDay(),di=dow===0?6:dow-1;
-      const holiday=isHol(ds);
-      // 여행 기간 체크
-      const inTravel=data.travels.find(t=>t.startDate<=ds&&t.endDate>=ds);
-      let style='';
-      if(inTravel&&!isT)style=`background:${evBg(inTravel.color)};color:${evTxt(inTravel.color)};border-radius:3px;`;
-      const cls='year-day'+(isT?' today':holiday&&!isT?' sun':di===5&&!isT?' sat':di===6&&!isT?' sun':'');
-      html+=`<div class="${cls}" style="${style}" title="${inTravel?inTravel.name:''}">${d}</div>`;
-    }
-    html+=`</div></div>`;
-  }
-  html+=`</div>`;
+  html+=`<div class="card month-view" style="margin-bottom:14px"><div class="month-hdr">`;
+  ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach((d,i)=>html+=`<div class="month-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`);
+  html+=`</div><div class="month-grid">`;
 
-  // 해당 연도 여행 목록
+  let cells=[];
+  for(let i=0;i<offset;i++){let d=new Date(yr,mo,1-offset+i);cells.push({date:d,other:true});}
+  for(let i=1;i<=last.getDate();i++)cells.push({date:new Date(yr,mo,i),other:false});
+  const rem=7-(cells.length%7);if(rem<7)for(let i=1;i<=rem;i++)cells.push({date:new Date(yr,mo+1,i),other:true});
+
+  cells.forEach(cell=>{
+    const ds=fmtDate(cell.date),isT=ds===todS;
+    const dow=cell.date.getDay(),di=dow===0?6:dow-1;
+    const hol=!cell.other?holName(ds):'';
+    const numColor=hol?'color:var(--red)':di===5?'color:var(--accent)':di===6?'color:var(--red)':'';
+    const travels=!cell.other?data.travels.filter(t=>t.startDate<=ds&&t.endDate>=ds):[];
+    html+=`<div class="month-cell${cell.other?' other':''}${isT?' today':''}"
+      onclick="${!cell.other?`openTravelModalDate('${ds}')`:''}"
+      oncontextmenu="event.preventDefault()">`;
+    html+=`<div class="month-cell-num" style="${numColor}"><span>${cell.date.getDate()}</span>${hol?`<span style="font-size:9px;color:var(--red);margin-left:3px">${hol}</span>`:''}</div>`;
+    travels.forEach(t=>{
+      const isStart=t.startDate===ds,isEnd=t.endDate===ds;
+      html+=`<div class="month-ev" style="background:${evBg(t.color)};color:${evTxt(t.color)};cursor:pointer" onclick="event.stopPropagation();openTravelModal('${t.id}')">
+        ${isStart?'✈️ ':''}${isStart?escH(t.name):''}
+      </div>`;
+    });
+    html+=`</div>`;
+  });
+  html+=`</div></div>`;
+
+  // 이달 여행 목록
+  const monthTravels=data.travels.filter(t=>{
+    const sy=t.startDate.slice(0,7),ey=t.endDate.slice(0,7),cur=`${yr}-${String(mo+1).padStart(2,'0')}`;
+    return sy<=cur&&ey>=cur;
+  }).sort((a,b)=>a.startDate.localeCompare(b.startDate));
+
   html+=`<div class="card" style="overflow:hidden">
     <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between">
-      ${yr}년 여행 <span style="font-size:11px;color:var(--text3);font-weight:400">${yearTravels.length}건</span>
+      ${yr}년 ${mo+1}월 여행 <span style="font-size:11px;color:var(--text3);font-weight:400">${monthTravels.length}건</span>
     </div>`;
-  if(yearTravels.length===0){
-    html+=`<div class="empty">여행 기록이 없어요 ✈️</div>`;
+
+  if(monthTravels.length===0){
+    html+=`<div class="empty">이달 여행 기록이 없어요 ✈️</div>`;
   } else {
-    yearTravels.forEach(t=>{
+    monthTravels.forEach(t=>{
       const start=parseDate(t.startDate),end=parseDate(t.endDate);
       const nights=Math.round((end-start)/(1000*60*60*24));
       html+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer" onclick="openTravelModal('${t.id}')">
@@ -1600,6 +1783,12 @@ function renderTravel(){
   }
   html+=`</div>`;
   document.getElementById('main-content').innerHTML=html;
+}
+
+function openTravelModalDate(ds){
+  openTravelModal();
+  document.getElementById('travel-start').value=ds;
+  document.getElementById('travel-end').value=ds;
 }
 
 function openTravelModal(id){
@@ -1634,19 +1823,19 @@ async function saveTravel(){
   if(startDate>endDate){alert('종료일이 시작일보다 빠릅니다.');return;}
   if(_editTravelId){
     const t=data.travels.find(x=>x.id===_editTravelId);
-    if(t){Object.assign(t,{name,destination:dest,startDate,endDate,color:_travelColor,memo});}
-  } else {
-    data.travels.push({id:makeId(),name,destination:dest,startDate,endDate,color:_travelColor,memo});
-  }
-  closeTravelModal();renderTravel();
-  setSyncing();
-  if(_editTravelId){
+    if(t)Object.assign(t,{name,destination:dest,startDate,endDate,color:_travelColor,memo});
+    closeTravelModal();renderTravel();
+    setSyncing();
     const{error}=await sb.from('travels').update({name,destination:dest,start_date:startDate,end_date:endDate,color:_travelColor,memo}).eq('id',_editTravelId).eq('user_id',currentUser.id);
     if(error){setSyncErr('Save Error');alert('Error: '+error.message);}else setSynced();
   } else {
-    const newT=data.travels[data.travels.length-1];
+    const newT={id:makeId(),name,destination:dest,startDate,endDate,color:_travelColor,memo};
+    data.travels.push(newT);
+    closeTravelModal();renderTravel();
+    setSyncing();
     const{error}=await sb.from('travels').insert({id:newT.id,user_id:currentUser.id,name,destination:dest,start_date:startDate,end_date:endDate,color:_travelColor,memo});
-    if(error){data.travels=data.travels.filter(t=>t.id!==newT.id);setSyncErr('Save Error');alert('Error: '+error.message);}else setSynced();
+    if(error){data.travels=data.travels.filter(t=>t.id!==newT.id);renderTravel();setSyncErr('Save Error');alert('Error: '+error.message);}
+    else setSynced();
   }
 }
 async function deleteTravel(){
@@ -1656,7 +1845,7 @@ async function deleteTravel(){
   closeTravelModal();renderTravel();
   setSyncing();
   const{error}=await sb.from('travels').delete().eq('id',_editTravelId).eq('user_id',currentUser.id);
-  if(error){if(backup)data.travels.push(backup);renderTravel();setSyncErr('Delete Error');alert('Delete failed');}
+  if(error){if(backup)data.travels.push(backup);renderTravel();setSyncErr('Delete Error');}
   else setSynced();
 }
 function loadTravelsLocal(){}
@@ -1846,20 +2035,16 @@ async function addDayTask(ds){
 
 // Todo Panel
 let _hideDone=false;
-function updateTpProj(){
-  const type=document.getElementById('tp-type-sel')?.value||'proj';
-  const sel=document.getElementById('tp-proj-sel');
-  if(!sel)return;
-  if(type==='proj'){
-    sel.innerHTML='<option value="">None</option>'+data.projects.map(p=>`<option value="proj:${p.id}">${escH(p.name)}</option>`).join('');
-  } else {
-    sel.innerHTML='<option value="">None</option>'+data.timedCats.map(c=>`<option value="timed:${c.id}">${c.emoji?c.emoji+' ':''}${escH(c.name)}</option>`).join('');
-  }
-}
+function updateTpProj(){/* deprecated */}
 function toggleTodos(){
   const p=document.getElementById('todo-panel');
   if(p.style.display==='none'||!p.style.display){
-    updateTpProj();
+    // proj select 채우기
+    const sel=document.getElementById('tp-proj-sel');
+    if(sel)sel.innerHTML='<option value="">No project</option>'+data.projects.map(pr=>`<option value="${pr.id}">${escH(pr.name)}</option>`).join('');
+    // 날짜 오늘로
+    const dateEl=document.getElementById('tp-date');
+    if(dateEl&&!dateEl.value)dateEl.value=todayStr();
     renderTodoPanel();p.style.display='flex';
     pushUiState('todo-panel');
   }else p.style.display='none';
@@ -1867,56 +2052,91 @@ function toggleTodos(){
 function closeTodoPanel(){document.getElementById('todo-panel').style.display='none';}
 function toggleHideDone(){_hideDone=!_hideDone;document.getElementById('hide-done-btn').textContent=_hideDone?'Show Done':'Hide Done';renderTodoPanel();}
 function renderTodoPanel(){
-  // 독립 태스크
-  let indep=data.tasks.filter(t=>!t.eventId);
-  if(_hideDone)indep=indep.filter(t=>!t.done);
+  // 날짜별로 그룹핑 (독립 task + 세부항목 모두)
+  const allDates=new Set();
+  data.tasks.forEach(t=>{if(t.date)allDates.add(t.date);});
+  // 날짜 없는 것도 포함
+  const hasNoDate=data.tasks.some(t=>!t.date&&!t.eventId);
+  const sortedDates=[...allDates].sort();
 
   let h='';
-  if(indep.length===0&&data.projEvents.length===0){h=`<div class="empty">No tasks</div>`;}
 
-  // 프로젝트 이벤트별 세부항목
-  const eventsWithSubs=data.projEvents.filter(ev=>data.tasks.some(t=>t.eventId===ev.id));
-  eventsWithSubs.forEach(ev=>{
-    const subs=data.tasks.filter(t=>t.eventId===ev.id);
-    const filtered=_hideDone?subs.filter(t=>!t.done):subs;
-    if(filtered.length===0)return;
-    const p=proj(ev.projectId),c=p.color||'#4472C4';
-    h+=`<div style="padding:5px 14px 2px;font-size:11px;font-weight:600;color:${c};display:flex;align-items:center;gap:5px;cursor:pointer" onclick="openEditItem('proj','${ev.id}')">
-      <span style="width:6px;height:6px;border-radius:50%;background:${c};display:inline-block"></span>${escH(ev.title)}
-      <span style="font-size:10px;color:var(--text3);font-weight:400">${ev.date}</span>
+  // 날짜별 섹션
+  sortedDates.forEach(ds=>{
+    const dayIndep=data.tasks.filter(t=>t.date===ds&&!t.eventId&&(!_hideDone||!t.done));
+    // 이 날짜에 연결된 proj event의 세부항목
+    const dayEvIds=new Set(data.projEvents.filter(e=>e.date===ds).map(e=>e.id));
+    const daySubs=data.tasks.filter(t=>t.date===ds&&t.eventId&&(!_hideDone||!t.done));
+
+    if(dayIndep.length===0&&daySubs.length===0)return;
+
+    const d=parseDate(ds);
+    const isToday=ds===todayStr();
+    h+=`<div style="padding:5px 14px 2px;font-size:11px;font-weight:600;background:var(--surface2);display:flex;align-items:center;justify-content:space-between">
+      <span style="color:${isToday?'var(--accent)':'var(--text3)'}">${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일${isToday?' (오늘)':''}</span>
     </div>`;
-    filtered.forEach(td=>{
-      h+=`<div class="todo-item" style="padding-left:26px">
+
+    // 독립 tasks
+    dayIndep.forEach(td=>{
+      const p=proj(td.projectId),c=p.color||'#999';
+      const subs=data.tasks.filter(s=>s.eventId===td.id);
+      h+=`<div class="todo-item" style="flex-direction:column;align-items:flex-start;gap:0;padding:6px 14px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:7px;width:100%">
+          <input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked)">
+          <span class="todo-txt${td.done?' done':''}" style="flex:1">${escH(td.title)}</span>
+          ${p.name?`<span style="font-size:10px;color:${c};flex-shrink:0">${p.name}</span>`:''}
+          <button class="todo-del" onclick="deleteTask('${td.id}')">✕</button>
+        </div>
+      </div>`;
+    });
+
+    // 세부항목 (proj event 소속)
+    daySubs.forEach(td=>{
+      const ev=data.projEvents.find(e=>e.id===td.eventId);
+      const evColor=ev?proj(ev.projectId).color||'#4472C4':'#999';
+      h+=`<div class="todo-item" style="padding:4px 14px 4px 28px;border-bottom:1px solid var(--border)">
         <input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked)">
-        <span class="todo-txt${td.done?' done':''}" style="flex:1">${escH(td.title)}</span>
+        <span class="todo-txt${td.done?' done':''}" style="flex:1;font-size:12px">${escH(td.title)}</span>
+        ${ev?`<span style="font-size:10px;color:${evColor};flex-shrink:0">${escH(ev.title)}</span>`:''}
+        <input type="date" value="${td.date||''}" title="날짜 변경"
+          style="width:110px;padding:1px 4px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:10px;background:var(--bg);color:var(--text);outline:none;margin-left:4px"
+          onchange="changeSubDate('${td.id}',this.value)">
         <button class="todo-del" onclick="deleteTask('${td.id}')">✕</button>
       </div>`;
     });
   });
 
-  // 독립 태스크 (프로젝트별 그룹)
-  if(indep.length>0){
-    if(eventsWithSubs.length>0)h+=`<div style="height:1px;background:var(--border);margin:6px 0"></div>`;
-    const byProj={};
-    indep.forEach(td=>{const pid=td.projectId||'_none';if(!byProj[pid])byProj[pid]=[];byProj[pid].push(td);});
-    Object.entries(byProj).forEach(([pid,ptds])=>{
-      const p=pid==='_none'?{name:'No Project',color:'var(--text3)'}:proj(pid);
-      h+=`<div style="padding:5px 14px 2px;font-size:11px;font-weight:600;color:${p.color};letter-spacing:.5px">${p.name}</div>`;
-      ptds.forEach(td=>{h+=`<div class="todo-item"><input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked)"><span class="todo-txt${td.done?' done':''}" style="flex:1">${escH(td.title)}</span><button class="todo-del" onclick="deleteTask('${td.id}')">✕</button></div>`;});
-    });
+  // 날짜 없는 독립 tasks
+  if(hasNoDate){
+    const noDateTasks=data.tasks.filter(t=>!t.date&&!t.eventId&&(!_hideDone||!t.done));
+    if(noDateTasks.length>0){
+      h+=`<div style="padding:5px 14px 2px;font-size:11px;font-weight:600;color:var(--text3);background:var(--surface2)">날짜 없음</div>`;
+      noDateTasks.forEach(td=>{
+        h+=`<div class="todo-item"><input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked)"><span class="todo-txt${td.done?' done':''}" style="flex:1">${escH(td.title)}</span><button class="todo-del" onclick="deleteTask('${td.id}')">✕</button></div>`;
+      });
+    }
   }
 
-  document.getElementById('todo-panel-body').innerHTML=h||`<div class="empty">No tasks</div>`;
+  if(!h)h=`<div class="empty">No tasks 🎉</div>`;
+  document.getElementById('todo-panel-body').innerHTML=h;
+}
+
+async function changeSubDate(id,newDate){
+  const td=data.tasks.find(t=>t.id===id);if(!td)return;
+  const old=td.date;
+  td.date=newDate;
+  renderTodoPanel();
+  const err=await saveTask(td);
+  if(err){td.date=old;renderTodoPanel();}
 }
 async function addPanelTodo(){
   const inp=document.getElementById('tp-inp');
   const title=inp.value.trim();if(!title)return;
-  const selVal=document.getElementById('tp-proj-sel').value||'';
-  const [selType,selId]=selVal.includes(':')?selVal.split(':'):['proj',selVal];
-  const pid=selType==='proj'?selId:'';
-  const catId=selType==='timed'?selId:'';
-  const td={id:makeId(),title,date:todayStr(),projectId:pid,timedCategoryId:catId,done:false,eventId:''};
-  data.tasks.push(td);inp.value='';renderAll();renderTodoPanel();await saveTask(td);
+  const date=document.getElementById('tp-date')?.value||todayStr();
+  const pid=document.getElementById('tp-proj-sel')?.value||'';
+  const td={id:makeId(),title,date,projectId:pid,done:false,eventId:''};
+  data.tasks.push(td);inp.value='';renderAll();renderTodoPanel();
+  await saveTask(td);
 }
 
 // ── Projects ──────────────────────────────────────────────
