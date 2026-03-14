@@ -66,7 +66,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 .body{flex:1;display:flex;overflow:hidden;}
 
 /* Sidebar */
-.sidebar{width:var(--sb);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;height:100%;}
+.sidebar{width:var(--sb);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;height:100vh;position:sticky;top:0;align-self:flex-start;}
 .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:199;}
 .sb-header{padding:14px 14px 8px;border-bottom:1px solid var(--border);flex-shrink:0;}
 .sb-logo{font-family:var(--font-ui);font-size:15px;font-weight:600;letter-spacing:-.3px;}
@@ -385,8 +385,12 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
   </div>
   <div style="flex:1;overflow-y:auto" id="todo-panel-body"></div>
   <div class="quick-add" style="border-top:1px solid var(--border)">
+    <select id="tp-type-sel" style="padding:6px 8px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;max-width:100px" onchange="updateTpProj()">
+      <option value="proj">Project</option>
+      <option value="timed">Timed</option>
+    </select>
     <select id="tp-proj-sel" style="padding:6px 8px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;max-width:120px">
-      <option value="">No project</option>
+      <option value="">None</option>
     </select>
     <input type="text" id="tp-inp" placeholder="Add task..." onkeydown="if(event.key==='Enter')addPanelTodo()" style="flex:1">
     <button onclick="addPanelTodo()">+</button>
@@ -525,7 +529,13 @@ const todayStr=()=>fmtDate(today);
 const parseDate=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);};
 const ym=(y,mo,d)=>`${y}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 const timeDiff=(a,b)=>{if(!a||!b)return 0;const[ah,am]=a.split(':').map(Number),[bh,bm]=b.split(':').map(Number);return(bh*60+bm)-(ah*60+am);};
-const makeId=()=>typeof crypto!=='undefined'&&crypto.randomUUID?crypto.randomUUID():'id-'+Date.now()+'-'+Math.random().toString(36).slice(2,9);
+const makeId=()=>{
+  try{return crypto.randomUUID();}
+  catch(e){
+    // fallback: RFC4122 compliant UUID
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);return v.toString(16);});
+  }
+};
 const escH=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 
 let state={view:'home',cursor:new Date(today),selected:todayStr(),projFilter:null,timedFilter:null};
@@ -878,28 +888,33 @@ function renderMonth(){
         <span style="width:10px;height:10px;border-radius:50%;background:${p.color};display:inline-block"></span>${escH(p.name)} 일정
       </div>`;
     if(evs.length===0)html+=`<div class="empty">No events</div>`;
-    else evs.forEach(ev=>html+=`<div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid var(--border);cursor:pointer" onclick="openEditItem('proj','${ev.id}')"><span style="font-size:11px;color:var(--text3);width:80px;flex-shrink:0">${ev.date}</span><span style="font-size:13px">${escH(ev.title)}</span></div>`);
+    else evs.forEach(ev=>{
+      const memoKey=`ev_memo_${ev.id}`;
+      const memoVal=data.classMemos[memoKey]||'';
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid var(--border)">
+        <div style="cursor:pointer;flex:1;display:flex;align-items:center;gap:8px" onclick="openEditItem('proj','${ev.id}')">
+          <span style="font-size:11px;color:var(--text3);width:80px;flex-shrink:0">${ev.date}</span>
+          <span style="font-size:13px">${escH(ev.title)}</span>
+        </div>
+        <input type="text" value="${escH(memoVal)}" placeholder="메모..."
+          style="width:180px;padding:3px 8px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font)"
+          onblur="saveEvMemo('${ev.id}',this.value)"
+          onkeydown="if(event.key==='Enter')this.blur()"
+          onclick="event.stopPropagation()">
+      </div>`;
+    });
     html+=`</div>`;
 
-    // Class memo table
-    if(isClass){
-      html+=`<div class="card" style="margin-top:14px;overflow:hidden">
-        <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600">주차별 메모</div>
-        <div style="overflow-x:auto"><table class="class-memo-table">
-          <tr><th style="width:60px">주차</th><th>메모</th></tr>`;
-      for(let w=1;w<=15;w++){
-        const key=`${state.projFilter}_${w}`;
-        const val=data.classMemos[key]||'';
-        html+=`<tr><td style="font-size:12px;color:var(--text3);text-align:center;font-weight:500">${w}주차</td>
-          <td><input class="class-memo-inp" type="text" value="${escH(val)}" placeholder="메모..." 
-            onblur="saveClassMemoInp('${state.projFilter}',${w},this.value)"
-            onkeydown="if(event.key==='Enter')this.blur()"></td></tr>`;
-      }
-      html+=`</table></div></div>`;
-    }
+
   }
 
   document.getElementById('main-content').innerHTML=html;
+}
+async function saveEvMemo(evId,val){
+  const key=`ev_memo_${evId}`;
+  data.classMemos[key]=val;
+  // event_id를 project_id로 사용해서 저장 (week=0)
+  await saveClassMemo(evId,0,val);
 }
 async function saveClassMemoInp(pid,week,content){
   data.classMemos[`${pid}_${week}`]=content;
@@ -931,14 +946,15 @@ function renderYear(){
 }
 // ── Day View ──────────────────────────────────────────────
 if(!window.dayBlocks)window.dayBlocks={};
+if(!window.dayBlockCols)window.dayBlockCols=['작업','학습','기타'];
 function renderDay(){
   const ds=fmtDate(state.cursor);
   const tes=timedEventsOn(ds),pevs=projEventsOn(ds),alltds=tasksOn(ds);
   const hol=holName(ds);
   if(!window.dayBlocks[ds])window.dayBlocks[ds]={};
 
-  // Active projects (those with events today)
-  const activeProjs=data.projects.filter(p=>pevs.some(e=>e.projectId===p.id));
+  // Time block columns - 3 fixed, user-named
+  const cols=window.dayBlockCols;
 
   let html=`<div class="day-view">`;
 
@@ -968,46 +984,50 @@ function renderDay(){
   html+=`</div>`;
 
   // Time blocks — columns = active projects today
-  const blockProjs=activeProjs.length>0?activeProjs:data.projects;
   html+=`<div class="card" style="overflow:hidden">
-    <div style="padding:9px 14px;font-size:13px;font-weight:500;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
-      Time Blocks <span style="font-size:11px;color:var(--text3);font-weight:400">Drag to mark · Click to note</span>
+    <div style="padding:9px 14px;font-size:13px;font-weight:500;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      Time Blocks
+      <div style="display:flex;gap:4px;margin-left:auto">
+        ${cols.map((c,i)=>`<input type="text" value="${c}" placeholder="Col ${i+1}"
+          style="width:60px;padding:2px 5px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:11px;background:var(--bg);color:var(--text);outline:none;text-align:center"
+          onblur="setBlockCol(${i},this.value)" onkeydown="if(event.key==='Enter')this.blur()">`).join('')}
+      </div>
     </div>
-    <div style="display:grid;grid-template-columns:44px repeat(${blockProjs.length},1fr);border-bottom:1px solid var(--border);background:var(--surface2)">
+    <div style="display:grid;grid-template-columns:44px repeat(3,1fr);border-bottom:1px solid var(--border);background:var(--surface2)">
       <div></div>`;
-  blockProjs.forEach(p=>html+=`<div style="font-size:10px;font-weight:600;color:${p.color};padding:5px 4px;text-align:center;border-left:1px solid var(--border)">${escH(p.name)}</div>`);
+  cols.forEach((c,i)=>html+=`<div style="font-size:10px;font-weight:600;color:var(--accent);padding:5px 4px;text-align:center;border-left:1px solid var(--border)">${escH(c)}</div>`);
   html+=`</div>`;
   const hrs=[];for(let h=7;h<=30;h++)hrs.push(h%24);
   hrs.forEach((h,hi)=>{
     const hs=String(h).padStart(2,'0')+':00';
-    html+=`<div style="display:grid;grid-template-columns:44px repeat(${blockProjs.length},1fr);border-bottom:1px solid var(--border);min-height:32px">
+    html+=`<div style="display:grid;grid-template-columns:44px repeat(3,1fr);border-bottom:1px solid var(--border);min-height:32px">
       <div style="font-size:10px;color:var(--text3);padding:3px 3px 0;text-align:right;line-height:1">${hs}</div>`;
-    blockProjs.forEach(p=>{
-      const key=`${h}_${p.id}`;
+    cols.forEach((colName,ci)=>{
+      const key=`${h}_col${ci}`;
       const has=key in window.dayBlocks[ds];
       const val=has?window.dayBlocks[ds][key]:'';
-      const c=p.color||'#4472C4';
       const prevH=hi>0?hrs[hi-1]:null;
-      const isFirst=has&&(!prevH||!(`${prevH}_${p.id}` in window.dayBlocks[ds]));
-      html+=`<div data-h="${h}" data-pid="${p.id}" data-ds="${ds}"
-        style="border-left:1px solid var(--border);padding:2px 3px;cursor:crosshair;user-select:none;${has?`background:${evBg(c)};`:''}"
-        onmousedown="startBlockDrag(event,'${ds}',${h},'${p.id}')"
-        onmouseenter="continueBlockDrag(event,'${ds}',${h},'${p.id}')"
+      const isFirst=has&&(!prevH||(!((`${prevH}_col${ci}`) in window.dayBlocks[ds])));
+      html+=`<div data-h="${h}" data-pid="col${ci}" data-ds="${ds}"
+        style="border-left:1px solid var(--border);padding:2px 3px;cursor:crosshair;user-select:none;${has?'background:var(--accent-bg);':''}"
+        onmousedown="startBlockDrag(event,'${ds}',${h},'col${ci}')"
+        onmouseenter="continueBlockDrag(event,'${ds}',${h},'col${ci}')"
         onmouseup="endBlockDrag()"
-        ontouchstart="startBlockDrag(event,'${ds}',${h},'${p.id}')"
+        ontouchstart="startBlockDrag(event,'${ds}',${h},'col${ci}')"
         ontouchmove="touchMoveBlock(event)"
         ontouchend="endBlockDrag()">
         ${isFirst?`<input type="text" value="${escH(val)}" placeholder="note..."
-          style="width:100%;border:none;background:transparent;font-size:10px;color:${evTxt(c)};outline:none;font-family:var(--font);pointer-events:auto"
+          style="width:100%;border:none;background:transparent;font-size:10px;color:var(--accent-txt);outline:none;font-family:var(--font);pointer-events:auto"
           onmousedown="event.stopPropagation()"
-          onblur="saveBlock('${ds}',${h},'${p.id}',this.value)"
-          onkeydown="if(event.key==='Enter')this.blur()">`:''}\n      </div>`;
+          onblur="saveBlock('${ds}',${h},'col${ci}',this.value)"
+          onkeydown="if(event.key==='Enter')this.blur()">`:''}
+      </div>`;
     });
     html+=`</div>`;
   });
   html+=`</div>`;
 
-  // Tasks
+  // Tasks - side by side with nothing (full width)
   html+=`<div class="card" style="overflow:hidden">
     <div style="padding:9px 14px;font-size:13px;font-weight:500;border-bottom:1px solid var(--border)">Tasks</div>`;
   const linkedIds=new Set();
@@ -1048,6 +1068,10 @@ function continueBlockDrag(e,ds,h,pid){if(!_drag||_drag.pid!==pid||_drag.ds!==ds
 function endBlockDrag(){_drag=null;}
 function touchMoveBlock(e){if(!_drag)return;e.preventDefault();const t=e.touches[0];const el=document.elementFromPoint(t.clientX,t.clientY);if(!el)return;const cell=el.closest('[data-h][data-pid]');if(!cell)return;continueBlockDrag(e,cell.dataset.ds,parseInt(cell.dataset.h),cell.dataset.pid);}
 document.addEventListener('mouseup',()=>_drag=null);
+function setBlockCol(i,name){
+  window.dayBlockCols[i]=name||['작업','학습','기타'][i];
+  renderDay();
+}
 function saveBlock(ds,h,pid,val){if(!window.dayBlocks[ds])window.dayBlocks[ds]={};const key=`${h}_${pid}`;if(val.trim()==='')delete window.dayBlocks[ds][key];else window.dayBlocks[ds][key]=val.trim();renderDay();}
 // ── Golf ──────────────────────────────────────────────────
 function renderGolf(){
@@ -1456,12 +1480,21 @@ async function addDayTask(ds){
 
 // Todo Panel
 let _hideDone=false;
+function updateTpProj(){
+  const type=document.getElementById('tp-type-sel')?.value||'proj';
+  const sel=document.getElementById('tp-proj-sel');
+  if(!sel)return;
+  if(type==='proj'){
+    sel.innerHTML='<option value="">None</option>'+data.projects.map(p=>`<option value="proj:${p.id}">${escH(p.name)}</option>`).join('');
+  } else {
+    sel.innerHTML='<option value="">None</option>'+data.timedCats.map(c=>`<option value="timed:${c.id}">${c.emoji?c.emoji+' ':''}${escH(c.name)}</option>`).join('');
+  }
+}
 function toggleTodos(){
   const p=document.getElementById('todo-panel');
   if(p.style.display==='none'||!p.style.display){
     // fill project select
-    const sel=document.getElementById('tp-proj-sel');
-    sel.innerHTML='<option value="">No project</option>'+data.projects.map(p=>`<option value="${p.id}">${escH(p.name)}</option>`).join('');
+    updateTpProj();
     renderTodoPanel();p.style.display='flex';
   }else p.style.display='none';
 }
@@ -1486,8 +1519,11 @@ function renderTodoPanel(){
 async function addPanelTodo(){
   const inp=document.getElementById('tp-inp');
   const title=inp.value.trim();if(!title)return;
-  const pid=document.getElementById('tp-proj-sel').value||'';
-  const td={id:makeId(),title,date:todayStr(),projectId:pid,done:false,eventId:''};
+  const selVal=document.getElementById('tp-proj-sel').value||'';
+  const [selType,selId]=selVal.includes(':')?selVal.split(':'):['proj',selVal];
+  const pid=selType==='proj'?selId:'';
+  const catId=selType==='timed'?selId:'';
+  const td={id:makeId(),title,date:todayStr(),projectId:pid,timedCategoryId:catId,done:false,eventId:''};
   data.tasks.push(td);inp.value='';renderAll();renderTodoPanel();await saveTask(td);
 }
 
