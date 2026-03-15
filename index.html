@@ -1171,10 +1171,10 @@ function renderFiltered(){
       const memoKey=`ev_memo_${ev.id}`;
       const memoVal=data.classMemos[memoKey]||ev.note||'';
       html+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid var(--border)">
-        <div style="cursor:pointer;display:flex;align-items:center;gap:6px;flex:1;min-width:0;overflow:hidden" onclick="openEditItem('proj','${ev.id}')">
-          <span style="font-size:11px;color:var(--text3);flex-shrink:0">${ev.date}</span>
-          ${!hasProjFilter?`<span style="font-size:10px;font-weight:600;color:${pr.color};flex-shrink:0">${pr.name}</span>`:''}
-          <span style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(ev.title)}</span>
+        <div style="cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0" onclick="openEditItem('proj','${ev.id}')">
+          <span style="font-size:11px;color:var(--text3);width:76px;flex-shrink:0">${ev.date}</span>
+          ${!hasProjFilter?`<span style="font-size:11px;font-weight:600;color:${pr.color};white-space:nowrap;flex-shrink:0">${pr.name}</span>`:''}
+          <span style="font-size:13px;white-space:nowrap">${escH(ev.title)}</span>
         </div>
         <input type="text" value="${escH(memoVal)}" placeholder=""
           style="flex:1;min-width:0;padding:4px 10px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font);margin-left:8px"
