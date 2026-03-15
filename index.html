@@ -233,6 +233,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 @media(max-width:768px){
   .sidebar{position:fixed;top:0;left:0;height:100vh;z-index:200;transform:translateX(-100%);transition:transform .25s ease;box-shadow:4px 0 20px rgba(0,0,0,.15);}
   .main{margin-left:0 !important;}
+  .home-grid{grid-template-columns:1fr !important;}
   .sidebar.open{transform:translateX(0);}
   .sb-overlay.open{display:block;}
   .ham-btn{display:flex !important;}
@@ -332,8 +333,8 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
       <div class="nav-div"></div>
       <div class="nav-sec">
         <div class="nav-lbl">Records</div>
-        <button class="nav-btn" data-view="period" onclick="setView('period')"><span class="nav-icon" style="color:var(--pink)">🌸</span>Period</button>
         <button class="nav-btn" data-view="travel" onclick="setView('travel')"><span class="nav-icon" style="color:#0891B2">✈️</span>Travel</button>
+        <button class="nav-btn" data-view="period" onclick="setView('period')"><span class="nav-icon" style="color:var(--pink)">🌸</span>Period</button>
       </div>
       <div id="backup-status"></div>
     </aside>
@@ -567,7 +568,7 @@ function isHol(ds){return !!HOLIDAYS[ds];}
 let data={
   projects:[],timedEvents:[],timedCats:[],
   projEvents:[],tasks:[],
-  golf:{},office:{},cellColors:{},
+  golf:{},office:{},cellColors:{},cellEmojis:{},
   anniversaries:[],periodLogs:[],travels:[],
   homeNote:'',classMemos:{},haegobjMemos:{},
   projOrder:[]
@@ -700,24 +701,29 @@ async function loadAll(){
 
     data.golf={};(gRes.data||[]).forEach(g=>{data.golf[g.date]={rounds:g.rounds||[],weather:g.weather||''};});
     data.office={};(oRes.data||[]).forEach(o=>{data.office[o.date]={in:o.time_in||'',out:o.time_out||''};});
-    data.cellColors={};(ccRes.data||[]).forEach(c=>{data.cellColors[c.date]=c.color;});
+    data.cellColors={};data.cellEmojis={};
+    (ccRes.data||[]).forEach(c=>{
+      if(c.date&&c.date.startsWith('emoji_')){data.cellEmojis[c.date.slice(6)]=c.color;}
+      else{data.cellColors[c.date]=c.color;}
+    });
     data.anniversaries=(anRes.data||[]).map(a=>({id:a.id,name:a.name,emoji:a.emoji||'🎉',month:a.month,day:a.day,year:a.year||null,repeatYearly:a.repeat_yearly}));
     data.periodLogs=(plRes.data||[]).map(p=>({id:p.id,startDate:p.start_date})).sort((a,b)=>b.startDate.localeCompare(a.startDate));
     data.travels=(trRes.data||[]).map(t=>({id:t.id,name:t.name,destination:t.destination||'',startDate:t.start_date,endDate:t.end_date,color:t.color||'#4472C4',memo:t.memo||''})).sort((a,b)=>a.startDate.localeCompare(b.startDate));
     data.homeNote=hnRes.data?.note1||'';
-    data.classMemos={};
-    data.haegobjMemos={};
+    data.classMemos={};data.haegobjMemos={};
     (cmRes.data||[]).forEach(m=>{
-      if(m.project_id&&m.project_id.startsWith('haegobj_')){
-        const ds=m.project_id.replace('haegobj_','');
-        data.haegobjMemos[ds]=m.content||'';
+      if(!m.project_id)return;
+      if(m.project_id.startsWith('haegobj_')){
+        data.haegobjMemos[m.project_id.replace('haegobj_','')]=m.content||'';
+      } else if(m.project_id.startsWith('travel_')){
+        data.classMemos[m.project_id]=m.content||'';
+      } else if(m.week===0){
+        data.classMemos[`ev_memo_${m.project_id}`]=m.content||'';
+        data.classMemos[`te_memo_${m.project_id}`]=m.content||'';
       } else {
         data.classMemos[`${m.project_id}_${m.week}`]=m.content||'';
       }
     });
-    (cmRes.data||[]).forEach(m=>{if(m.week===0&&!m.project_id.startsWith('haegobj_'))data.classMemos[`ev_memo_${m.project_id}`]=m.content||'';});
-    // class_memos week=0은 ev_memo
-    (cmRes.data||[]).forEach(m=>{if(m.week===0)data.classMemos[`ev_memo_${m.project_id}`]=m.content||'';});
 
     setSynced();renderAll();
   }catch(e){console.error(e);setSyncErr('Load Error');}
@@ -895,7 +901,7 @@ function renderHome(){
   const tes=timedEventsOn(ds),pevs=projEventsOn(ds),tds=data.tasks.filter(t=>!t.done&&!t.eventId);
   const d=new Date();
   const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  let html=`<div style="display:grid;grid-template-columns:1fr 300px;gap:14px;align-items:start">`;
+  let html=`<div style="display:grid;grid-template-columns:1fr 300px;gap:14px;align-items:start" class="home-grid">`;
   html+=`<div style="display:flex;flex-direction:column;gap:12px">`;
   // Header
   html+=`<div class="card" style="padding:16px 18px;display:flex;align-items:center;justify-content:space-between">
@@ -1003,9 +1009,11 @@ function renderMonth(){
         if(hol)lbls+=`<span style="font-size:9px;color:var(--red);font-weight:500;margin-left:3px">${hol}</span>`;
         annivs.forEach(a=>lbls+=`<span style="font-size:9px;color:var(--accent);font-weight:500;margin-left:3px">${a.emoji||''}${a.name}</span>`);
       }
+      const cellEmoji=!cell.other?(data.cellEmojis[ds]||''):'';
       html+=`<div class="month-cell-num" style="${numColor}${cellBg&&!cell.other?`color:${cellBg};font-weight:700;`:''}">
         <span>${cell.date.getDate()}</span>${cellBg&&!cell.other?`<span class="cell-dot" style="background:${cellBg}"></span>`:''}${lbls}
-      </div>`;
+      </div>
+      ${cellEmoji?`<div style="font-size:20px;text-align:center;line-height:1;margin:2px 0;cursor:pointer" onclick="event.stopPropagation();openCellColorPicker('${ds}',event)">${cellEmoji}</div>`:''}`;
       // 전체 표시 (Timed + Project + Task + Travel)
       data.timedEvents.filter(t=>t.date===ds).sort((a,b)=>a.time.localeCompare(b.time)).forEach(te=>{const cat=timedCat(te.categoryId),c=cat.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)};display:flex;gap:2px" onclick="event.stopPropagation();openEditItem('timed','${te.id}')"><span style="opacity:.75;font-size:9px;flex-shrink:0">${te.time}</span><span style="overflow:hidden;text-overflow:ellipsis">${escH(te.title)}</span></div>`;});
       data.projEvents.filter(e=>e.date===ds).forEach(ev=>{const p=proj(ev.projectId),c=p.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}" onclick="event.stopPropagation();openEditItem('proj','${ev.id}')">${escH(ev.title)}</div>`;});
@@ -1143,8 +1151,8 @@ function renderFiltered(){
       html+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid var(--border)">
         <div style="cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:0" onclick="openEditItem('proj','${ev.id}')">
           <span style="font-size:11px;color:var(--text3);width:76px;flex-shrink:0">${ev.date}</span>
-          ${!hasProjFilter?`<span style="font-size:10px;color:${pr.color};flex-shrink:0;width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pr.name}</span>`:''}
-          <span style="font-size:13px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(ev.title)}</span>
+          ${!hasProjFilter?`<span style="font-size:10px;color:${pr.color};flex-shrink:0;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pr.name}</span>`:''}
+          <span style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(ev.title)}</span>
         </div>
         <input type="text" value="${escH(memoVal)}" placeholder=""
           style="flex:1;min-width:0;padding:4px 10px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font);margin-left:8px"
@@ -1350,7 +1358,7 @@ function renderHaegobj(){
     const wStart=parseDate(wDays[0]),wEnd=parseDate(wDays[6]);
     const wLabel=`${wStart.getMonth()+1}/${wStart.getDate()} — ${wEnd.getMonth()+1}/${wEnd.getDate()}`;
 
-    html+=`<div class="card" style="flex-shrink:0;width:340px;overflow:hidden">
+    html+=`<div class="card" style="flex-shrink:0;width:280px;overflow:hidden">
       <div style="padding:8px 10px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text3)">${wLabel}</div>`;
 
     wDays.forEach((ds,di)=>{
@@ -1371,7 +1379,7 @@ function renderHaegobj(){
         </div>
         <!-- 메모 -->
         <textarea id="hobj-${ds}" placeholder=""
-          style="width:100%;min-height:120px;padding:6px 8px;border:none;background:transparent;font-size:11px;font-family:var(--font);color:var(--text);outline:none;resize:none;line-height:1.6"
+          style="width:100%;min-height:24px;padding:4px 6px;border:none;background:transparent;font-size:11px;font-family:var(--font);color:var(--text);outline:none;resize:none;line-height:1.5"
           onfocus="this.style.background='var(--accent-bg)'"
           onblur="this.style.background='transparent';saveHaegobjMemo('${ds}',this.value)"
         ></textarea>
@@ -1420,7 +1428,12 @@ function renderGolf(){
     rounds.forEach(r=>{if(Number(r.amount)>0){totalBase+=Number(r.amount)||0;totalOver+=Number(r.overFee)||0;totalRounds++;}});
     if(rounds.some(r=>Number(r.amount)>0))totalDays++;
   }
-  let html=`<div class="work-layout"><div class="card" style="overflow:hidden">
+    let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <button onclick="navigate(-1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">‹</button>
+    <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <button onclick="navigate(1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">›</button>
+  </div>`;
+  html+=`<div class="work-layout"><div class="card" style="overflow:hidden">
     <div style="padding:7px;font-size:11px;color:var(--text2);text-align:center;border-bottom:1px solid var(--border)">라운드 기록</div>
     <div class="work-cal-hdr">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d,i)=>`<div class="work-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`).join('')}</div>
     <div class="work-grid">`;
@@ -1580,7 +1593,12 @@ function renderStudio(){
   const offH=offMins/60,actH=actualMins/60;
   const hrPct=Math.min(100,Math.round(offH/100*100)),dayPct=Math.min(100,Math.round(offDays/10*100));
   const hrDone=offH>=100,dayDone=offDays>=10;
-  let html=`<div class="work-layout"><div class="card" style="overflow:hidden">
+    let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <button onclick="navigate(-1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">‹</button>
+    <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <button onclick="navigate(1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">›</button>
+  </div>`;
+  html+=`<div class="work-layout"><div class="card" style="overflow:hidden">
     <div style="padding:7px;font-size:11px;color:var(--text2);text-align:center;border-bottom:1px solid var(--border)">출퇴근 시간</div>
     <div class="work-cal-hdr">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d,i)=>`<div class="work-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`).join('')}</div>
     <div class="work-grid">`;
@@ -1671,7 +1689,12 @@ function renderPeriod(){
   const lastLog=logs[logs.length-1];
   const nextDate=lastLog?fmtDate(new Date(parseDate(lastLog.startDate).getTime()+avgCycle*24*60*60*1000)):'';
 
-  let html=`<div class="work-layout"><div class="card" style="overflow:hidden">
+    let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <button onclick="navigate(-1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">‹</button>
+    <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <button onclick="navigate(1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">›</button>
+  </div>`;
+  html+=`<div class="work-layout"><div class="card" style="overflow:hidden">
     <div style="padding:7px;font-size:11px;color:var(--text2);text-align:center;border-bottom:1px solid var(--border)">생리 기록 (날짜 클릭으로 기록)</div>
     <div class="work-cal-hdr">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d,i)=>`<div class="work-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`).join('')}</div>
     <div class="work-grid">`;
@@ -1679,7 +1702,7 @@ function renderPeriod(){
   for(let d=1;d<=lastDay.getDate();d++){
     const ds=ym(yr,mo,d),isPeriod=periodDates.has(ds);
     const dow=new Date(yr,mo,d).getDay(),isTod=ds===todayStr();
-    html+=`<div class="work-cell${isTod?' today':''}${isPeriod?' period-day':''}${dow===6&&!isTod?' sat':dow===0&&!isTod?' sun':''}" style="cursor:pointer;min-height:70px" onclick="togglePeriod('${ds}')">
+    html+=`<div class="work-cell${isTod?' today':''}${isPeriod?' period-day':''}${dow===6&&!isTod?' sat':dow===0&&!isTod?' sun':''}" style="cursor:pointer;min-height:90px" onclick="togglePeriod('${ds}')">
       <div class="work-num">${d}</div>
       ${isPeriod?`<div style="text-align:center;font-size:16px;margin-top:4px">🌸</div>`:''}
     </div>`;
@@ -1762,7 +1785,7 @@ function renderTodos(){
         <button onclick="openAddTaskModal('${ds}')" style="margin-left:auto;background:none;border:1px solid var(--border2);border-radius:var(--radius-xs);padding:3px 10px;cursor:pointer;font-size:13px;color:var(--text3)">+</button>
       </div>
       <!-- 내용 -->
-      <div style="min-height:400px">`;
+      <div style="min-height:533px">`;
 
     // proj event 세부항목 그룹
     dayPevs.forEach(ev=>{
@@ -2004,17 +2027,43 @@ function renderTravel(){
     monthTravels.forEach(t=>{
       const start=parseDate(t.startDate),end=parseDate(t.endDate);
       const nights=Math.round((end-start)/(1000*60*60*24));
-      html+=`<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer" onclick="openTravelModal('${t.id}')">
-        <div style="width:10px;height:10px;border-radius:50%;background:${t.color};flex-shrink:0"></div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:500">${escH(t.name)}</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:2px">
-            ${t.destination?`📍${escH(t.destination)} · `:''}${t.startDate} ~ ${t.endDate} (${nights}박${nights+1}일)
+      const isOpen=window._openTravel===t.id;
+      html+=`<div>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer" onclick="toggleTravelLog('${t.id}')">
+          <div style="width:10px;height:10px;border-radius:50%;background:${t.color};flex-shrink:0"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500">${escH(t.name)}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">
+              ${t.destination?`📍${escH(t.destination)} · `:''}${t.startDate} ~ ${t.endDate} (${nights}박${nights+1}일)
+            </div>
+            ${t.memo?`<div style="font-size:11px;color:var(--text2);margin-top:2px">${escH(t.memo)}</div>`:''}
           </div>
-          ${t.memo?`<div style="font-size:11px;color:var(--text2);margin-top:2px">${escH(t.memo)}</div>`:''}
-        </div>
-        <div style="font-size:20px">✈️</div>
-      </div>`;
+          <div style="display:flex;align-items:center;gap:6px">
+            <button onclick="event.stopPropagation();openTravelModal('${t.id}')" class="btn-cancel" style="font-size:11px;padding:2px 8px">✎</button>
+            <span style="font-size:12px;color:var(--text3)">${isOpen?'▲':'▼'}</span>
+          </div>
+        </div>`;
+      if(isOpen){
+        // 날짜별 기록
+        const days=[];
+        for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1))days.push(fmtDate(new Date(d)));
+        html+=`<div style="background:var(--surface2);padding:8px 14px;border-bottom:1px solid var(--border)">`;
+        days.forEach(ds=>{
+          const logKey=`travel_${t.id}_${ds}`;
+          const logVal=data.classMemos[logKey]||'';
+          const dd=parseDate(ds);
+          const dow=['일','월','화','수','목','금','토'][dd.getDay()];
+          html+=`<div style="display:flex;align-items:flex-start;gap:10px;padding:5px 0;border-bottom:1px solid var(--border)">
+            <div style="font-size:11px;color:var(--text3);width:70px;flex-shrink:0;padding-top:6px">${dd.getMonth()+1}/${dd.getDate()} (${dow})</div>
+            <input type="text" value="${escH(logVal)}" placeholder="${ds===fmtDate(start)?'출발...':ds===fmtDate(end)?'귀국...':''}"
+              style="flex:1;padding:5px 8px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font)"
+              onblur="saveTravelLog('${t.id}','${ds}',this.value)"
+              onkeydown="if(event.key==='Enter')this.blur()">
+          </div>`;
+        });
+        html+=`</div>`;
+      }
+      html+=`</div>`;
     });
   }
   html+=`</div>`;
@@ -2045,6 +2094,15 @@ function openTravelModal(id){
   pushUiState('travel-modal');
 }
 function closeTravelModal(){document.getElementById('travel-modal').style.display='none';}
+function toggleTravelLog(id){
+  window._openTravel=window._openTravel===id?null:id;
+  renderTravel();
+}
+async function saveTravelLog(travelId,ds,val){
+  const key=`travel_${travelId}_${ds}`;
+  data.classMemos[key]=val;
+  await saveClassMemo(`travel_${travelId}_${ds}`,0,val);
+}
 function renderTravelColors(){
   let h='';
   PALETTE.forEach(c=>h+=`<div class="color-sw${c===_travelColor?' selected':''}" style="background:${c}" data-c="${c}" onclick="pickTravelColor(this.dataset.c)"></div>`);
@@ -2117,7 +2175,7 @@ function openEditItem(type,id){
     document.getElementById('m-title').value=te.title;
     document.getElementById('m-date').value=te.date;
     document.getElementById('m-time').value=te.time;
-    document.getElementById('m-note').value='';
+    document.getElementById('m-note').value=data.classMemos[`te_memo_${id}`]||'';
     document.getElementById('m-del-btn').style.display='';
     document.getElementById('m-subtasks-sec').style.display='none';
     fillCatSelect(te.categoryId);
@@ -2128,7 +2186,7 @@ function openEditItem(type,id){
     document.getElementById('m-title').value=ev.title;
     document.getElementById('m-date').value=ev.date;
     document.getElementById('m-time').value=ev.start||'09:00';
-    document.getElementById('m-note').value=ev.note||'';
+    document.getElementById('m-note').value=data.classMemos[`ev_memo_${id}`]||ev.note||'';
     document.getElementById('m-del-btn').style.display='';
     document.getElementById('m-subtasks-sec').style.display='';
     fillProjSelect(ev.projectId);
@@ -2187,9 +2245,11 @@ async function saveItem(){
   if(_mType==='timed'){
     const catId=document.getElementById('m-category').value;
     const time=document.getElementById('m-time').value;
+    const note=document.getElementById('m-note').value;
     const te={id:_mMode==='add'?makeId():_mId,title,date,time,categoryId:catId};
-    if(_mMode==='add'){data.timedEvents.push(te);closeModal();renderAll();const err=await saveTimedEvent(te);if(err){data.timedEvents=data.timedEvents.filter(t=>t.id!==te.id);renderAll();alert('Error: '+err);}}
-    else{const i=data.timedEvents.findIndex(t=>t.id===_mId);const old=data.timedEvents[i];if(i>=0)data.timedEvents[i]=te;closeModal();renderAll();const err=await saveTimedEvent(te);if(err){if(i>=0)data.timedEvents[i]=old;renderAll();alert('Error: '+err);}}
+    if(note){data.classMemos[`te_memo_${te.id}`]=note;}
+    if(_mMode==='add'){data.timedEvents.push(te);closeModal();renderAll();const err=await saveTimedEvent(te);if(err){data.timedEvents=data.timedEvents.filter(t=>t.id!==te.id);renderAll();alert('Error: '+err);}else if(note)saveClassMemo(te.id+'_te',0,note);}
+    else{const i=data.timedEvents.findIndex(t=>t.id===_mId);const old=data.timedEvents[i];if(i>=0)data.timedEvents[i]=te;closeModal();renderAll();const err=await saveTimedEvent(te);if(err){if(i>=0)data.timedEvents[i]=old;renderAll();alert('Error: '+err);}else if(note)saveClassMemo(te.id+'_te',0,note);}
   } else if(_mType==='proj'){
     const pid=document.getElementById('m-project').value;
     const start=document.getElementById('m-time').value;
@@ -2595,16 +2655,34 @@ async function deleteTimedCat(id){
 function openCellColorPicker(ds,evt){
   document.getElementById('cell-color-picker-el')?.remove();
   const cur=data.cellColors[ds]||'';
-  let h=`<div id="cell-color-picker-el" class="cell-color-picker" onclick="event.stopPropagation()">
-    <div style="font-size:10px;color:var(--text3);margin-bottom:6px;font-weight:600">Cell Color</div>
+  const curEmoji=data.cellEmojis[ds]||'';
+  let h=`<div id="cell-color-picker-el" class="cell-color-picker" onclick="event.stopPropagation()" style="width:190px">
+    <div style="font-size:10px;color:var(--text3);margin-bottom:5px;font-weight:600">이모지</div>
+    <div style="display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap">
+      ${['☀️','🌙','🌧','❄️','🌸','🏠','🏖','🚗','✈️','🎉','📝','💊','💪','😴','❤️','⭐'].map(e=>`<span style="cursor:pointer;font-size:16px;padding:2px;border-radius:4px;${e===curEmoji?'background:var(--accent-bg)':''}" onclick="setCellEmoji('${ds}','${e==='${curEmoji}'?'':e}')">${e}</span>`).join('')}
+      <input type="text" value="${curEmoji}" maxlength="2" placeholder="✏️" 
+        style="width:32px;padding:2px;border:1px solid var(--border2);border-radius:4px;font-size:14px;text-align:center;background:var(--bg);outline:none"
+        oninput="setCellEmoji('${ds}',this.value)" onclick="event.stopPropagation()">
+      <button onclick="setCellEmoji('${ds}','')" style="font-size:10px;color:var(--text3);background:none;border:none;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:5px;font-weight:600">Cell Color</div>
     <div class="color-row" style="margin-bottom:6px">`;
   PALETTE.forEach(c=>h+=`<div class="color-sw${c===cur?' selected':''}" style="background:${c}" onclick="setCellColor('${ds}','${c}')"></div>`);
-  h+=`</div><button onclick="setCellColor('${ds}','')" class="btn-cancel" style="width:100%;font-size:11px;padding:3px">Clear</button></div>`;
+  h+=`</div><button onclick="setCellColor('${ds}','')" class="btn-cancel" style="width:100%;font-size:11px;padding:3px">Color Clear</button></div>`;
   document.body.insertAdjacentHTML('beforeend',h);
   const el=document.getElementById('cell-color-picker-el');
-  el.style.left=Math.min(evt.pageX,window.innerWidth-180)+'px';
-  el.style.top=Math.min(evt.pageY,window.innerHeight-200)+'px';
+  el.style.left=Math.min(evt.pageX,window.innerWidth-200)+'px';
+  el.style.top=Math.min(evt.pageY,window.innerHeight-320)+'px';
   setTimeout(()=>document.addEventListener('click',closeCellColorPicker,{once:true}),10);
+}
+async function setCellEmoji(ds,emoji){
+  if(emoji)data.cellEmojis[ds]=emoji;else delete data.cellEmojis[ds];
+  renderAll();
+  // cell_colors 테이블에 emoji도 저장 (color field에 JSON으로)
+  try{
+    if(emoji){await sb.from('cell_colors').upsert({user_id:currentUser.id,date:'emoji_'+ds,color:emoji});}
+    else{await sb.from('cell_colors').delete().eq('date','emoji_'+ds).eq('user_id',currentUser.id);}
+  }catch(e){}
 }
 async function setCellColor(ds,color){
   if(color)data.cellColors[ds]=color;else delete data.cellColors[ds];
