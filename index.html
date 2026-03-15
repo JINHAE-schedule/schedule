@@ -234,6 +234,13 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
   .sidebar{position:fixed;top:0;left:0;height:100vh;z-index:200;transform:translateX(-100%);transition:transform .25s ease;box-shadow:4px 0 20px rgba(0,0,0,.15);}
   .main{margin-left:0 !important;}
   .home-grid{grid-template-columns:1fr !important;}
+  /* M-1: 일간뷰 타임블록+태스크 세로 */
+  .day-tb-grid{grid-template-columns:1fr !important;}
+  /* M-3: 투두 세로 */
+  .todos-grid{grid-template-columns:1fr !important;}
+  /* M-4: HAEGOBJ 세로 */
+  .haegobj-weeks{flex-direction:column !important;}
+  .haegobj-weeks > div{width:100% !important;}
   .sidebar.open{transform:translateX(0);}
   .sb-overlay.open{display:block;}
   .ham-btn{display:flex !important;}
@@ -264,9 +271,6 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 <div id="app">
   <div class="topbar">
     <button class="ham-btn" onclick="toggleSb()">☰</button>
-    <button class="tb-nav" onclick="navigate(-1)">‹</button>
-    <button class="tb-nav" onclick="goToday()" style="font-family:var(--font-ui)">Today</button>
-    <button class="tb-nav" onclick="navigate(1)">›</button>
     <div class="tb-title" id="main-title"></div>
     <div id="sync-status"><div class="sync-dot" id="sync-dot"></div><span id="sync-txt">Synced</span></div>
     <button class="tb-btn" onclick="exportData()" title="Backup">⬇</button>
@@ -717,9 +721,12 @@ async function loadAll(){
         data.haegobjMemos[m.project_id.replace('haegobj_','')]=m.content||'';
       } else if(m.project_id.startsWith('travel_')){
         data.classMemos[m.project_id]=m.content||'';
+      } else if(m.project_id.startsWith('te_')&&m.week===0){
+        // timed event memo
+        data.classMemos[`te_memo_${m.project_id.slice(3)}`]=m.content||'';
       } else if(m.week===0){
+        // proj event memo
         data.classMemos[`ev_memo_${m.project_id}`]=m.content||'';
-        data.classMemos[`te_memo_${m.project_id}`]=m.content||'';
       } else {
         data.classMemos[`${m.project_id}_${m.week}`]=m.content||'';
       }
@@ -787,6 +794,21 @@ async function saveCellColor(ds,color){
 async function saveHomeNote(val){
   setSyncing();
   const{error}=await sb.from('home_notes').upsert({user_id:currentUser.id,note1:val},{onConflict:'user_id'});
+  if(error)setSyncErr('Save Error');else setSynced();
+}
+async function saveEvMemo(id,val){
+  // id가 'te_xxx' 이면 timed event memo, 아니면 proj event memo
+  const isTe=id.startsWith('te_');
+  const realId=isTe?id.slice(3):id;
+  const key=isTe?`te_memo_${realId}`:`ev_memo_${realId}`;
+  data.classMemos[key]=val;
+  // DB: project_id = realId, week = 0 (te는 te_ prefix 붙여서 구분)
+  const pid=isTe?`te_${realId}`:realId;
+  setSyncing();
+  const{error}=await sb.from('class_memos').upsert(
+    {user_id:currentUser.id,project_id:pid,week:0,content:val},
+    {onConflict:'user_id,project_id,week'}
+  );
   if(error)setSyncErr('Save Error');else setSynced();
 }
 async function saveClassMemo(pid,week,content){
@@ -968,7 +990,7 @@ function renderMonth(){
 
   // 현재 달 기준 앞뒤로 보여줄 달 범위: 현재달 + 이후 2달 (총 3달 연속)
   const months=[];
-  for(let i=0;i<3;i++){
+  for(let i=0;i<12;i++){
     const d=new Date(yr,mo+i,1);
     months.push({year:d.getFullYear(),month:d.getMonth()});
   }
@@ -1125,7 +1147,7 @@ function renderFiltered(){
         <div style="cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:0" onclick="openEditItem('timed','${te.id}')">
           <span style="font-size:11px;color:var(--text3);width:76px;flex-shrink:0">${te.date}</span>
           <span style="font-size:11px;font-weight:600;color:${c.color||'#4472C4'};width:36px;flex-shrink:0">${te.time}</span>
-          <span style="font-size:13px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(te.title)}</span>
+          <span style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${escH(te.title)}</span>
           ${!hasTimedFilter&&c.name?`<span style="font-size:10px;color:${c.color};flex-shrink:0">${c.emoji||''}${c.name}</span>`:''}
         </div>
         <input type="text" value="${escH(memoVal)}" placeholder=""
@@ -1151,7 +1173,7 @@ function renderFiltered(){
       html+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid var(--border)">
         <div style="cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:0" onclick="openEditItem('proj','${ev.id}')">
           <span style="font-size:11px;color:var(--text3);width:76px;flex-shrink:0">${ev.date}</span>
-          ${!hasProjFilter?`<span style="font-size:10px;color:${pr.color};flex-shrink:0;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pr.name}</span>`:''}
+          ${!hasProjFilter?`<span style="font-size:10px;color:${pr.color};flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px">${pr.name}</span>`:''}
           <span style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(ev.title)}</span>
         </div>
         <input type="text" value="${escH(memoVal)}" placeholder=""
@@ -1229,7 +1251,7 @@ function renderDay(){
   html+=`</div>`;
 
   // Time blocks — columns = active projects today
-  html+=`<div style="display:grid;grid-template-columns:3fr 2fr;gap:12px;align-items:start">`;
+  html+=`<div class="day-tb-grid" style="display:grid;grid-template-columns:3fr 2fr;gap:12px;align-items:start">`;
   html+=`<div class="card" style="overflow:hidden">
     <div style="padding:9px 14px;font-size:13px;font-weight:500;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       Time Blocks
@@ -1347,18 +1369,18 @@ function renderHaegobj(){
     <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
     <button onclick="navigate(1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">›</button>
     <span style="font-size:13px;font-weight:600;font-family:var(--font-ui);margin-left:4px">
-      ${sl.getFullYear()}년 ${sl.getMonth()+1}월 ${sl.getDate()}일 — ${el.getMonth()+1}월 ${el.getDate()}일
+      👗 HAEGOBJ &nbsp; ${sl.getFullYear()}년 ${sl.getMonth()+1}월 ${sl.getDate()}일 — ${el.getMonth()+1}월 ${el.getDate()}일
     </span>
   </div>`;
 
   // 3주 나란히 (가로 스크롤)
-  html+=`<div style="display:flex;gap:12px;overflow-x:auto;padding-bottom:8px">`;
+  html+=`<div class="haegobj-weeks" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:8px">`;
 
   weeks.forEach((wDays,wi)=>{
     const wStart=parseDate(wDays[0]),wEnd=parseDate(wDays[6]);
     const wLabel=`${wStart.getMonth()+1}/${wStart.getDate()} — ${wEnd.getMonth()+1}/${wEnd.getDate()}`;
 
-    html+=`<div class="card" style="flex-shrink:0;width:280px;overflow:hidden">
+    html+=`<div class="card" style="flex:1;min-width:260px;overflow:hidden">
       <div style="padding:8px 10px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text3)">${wLabel}</div>`;
 
     wDays.forEach((ds,di)=>{
@@ -1379,7 +1401,7 @@ function renderHaegobj(){
         </div>
         <!-- 메모 -->
         <textarea id="hobj-${ds}" placeholder=""
-          style="width:100%;min-height:24px;padding:4px 6px;border:none;background:transparent;font-size:11px;font-family:var(--font);color:var(--text);outline:none;resize:none;line-height:1.5"
+          style="width:100%;min-height:78px;padding:4px 6px;border:none;background:transparent;font-size:11px;font-family:var(--font);color:var(--text);outline:none;resize:none;line-height:1.5"
           onfocus="this.style.background='var(--accent-bg)'"
           onblur="this.style.background='transparent';saveHaegobjMemo('${ds}',this.value)"
         ></textarea>
@@ -1760,7 +1782,7 @@ function renderTodos(){
   </div>`;
 
   // 3열 가로 레이아웃
-  html+=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:start">`;
+  html+=`<div class="todos-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:start">`;
 
   days.forEach((ds,di)=>{
     const d=parseDate(ds);
@@ -1785,7 +1807,7 @@ function renderTodos(){
         <button onclick="openAddTaskModal('${ds}')" style="margin-left:auto;background:none;border:1px solid var(--border2);border-radius:var(--radius-xs);padding:3px 10px;cursor:pointer;font-size:13px;color:var(--text3)">+</button>
       </div>
       <!-- 내용 -->
-      <div style="min-height:533px">`;
+      <div style="min-height:600px">`;
 
     // proj event 세부항목 그룹
     dayPevs.forEach(ev=>{
