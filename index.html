@@ -665,7 +665,6 @@ async function showApp(user){
   initTheme();
   setupHistory();
   await loadAll();
-  loadTravelsLocal();
 }
 
 // ── Load All ──────────────────────────────────────────────
@@ -2144,11 +2143,16 @@ async function saveTravel(){
   if(startDate>endDate){alert('종료일이 시작일보다 빠릅니다.');return;}
   if(_editTravelId){
     const t=data.travels.find(x=>x.id===_editTravelId);
+    const backup=t?{...t}:null;
     if(t)Object.assign(t,{name,destination:dest,startDate,endDate,color:_travelColor,memo});
     closeTravelModal();renderTravel();
     setSyncing();
     const{error}=await sb.from('travels').update({name,destination:dest,start_date:startDate,end_date:endDate,color:_travelColor,memo}).eq('id',_editTravelId).eq('user_id',currentUser.id);
-    if(error){setSyncErr('Save Error');alert('Error: '+error.message);}else setSynced();
+    if(error){
+      // 롤백
+      if(t&&backup)Object.assign(t,backup);
+      renderTravel();setSyncErr('Save Error');alert('Error: '+error.message);
+    }else setSynced();
   } else {
     const newT={id:makeId(),name,destination:dest,startDate,endDate,color:_travelColor,memo};
     data.travels.push(newT);
@@ -2169,7 +2173,6 @@ async function deleteTravel(){
   if(error){if(backup)data.travels.push(backup);renderTravel();setSyncErr('Delete Error');}
   else setSynced();
 }
-function loadTravelsLocal(){}
 
 
 // ── Event Modal ───────────────────────────────────────────
@@ -2770,7 +2773,33 @@ async function importData(e){
       for(const[ds,rec]of Object.entries(d.golf||{}))await saveGolfRec(ds,rec);
       for(const[ds,rec]of Object.entries(d.office||{}))await saveOfficeRec(ds,rec);
       for(const[ds,c]of Object.entries(d.cellColors||{}))await saveCellColor(ds,c);
+      // cellEmojis - cell_colors 테이블에 emoji_ prefix로
+      for(const[ds,emoji]of Object.entries(d.cellEmojis||{}))
+        await sb.from('cell_colors').upsert({user_id:uid,date:'emoji_'+ds,color:emoji});
       if(d.homeNote)await saveHomeNote(d.homeNote);
+      // travels 복원
+      if((d.travels||[]).length){
+        await sb.from('travels').delete().eq('user_id',uid);
+        await sb.from('travels').insert(d.travels.map(t=>({id:t.id,user_id:uid,name:t.name,destination:t.destination||'',start_date:t.startDate,end_date:t.endDate,color:t.color||'#4472C4',memo:t.memo||''})));
+      }
+      // classMemos + haegobjMemos 복원
+      const allMemos=[];
+      Object.entries(d.classMemos||{}).forEach(([k,v])=>{
+        // ev_memo_xxx → project_id=xxx, week=0
+        if(k.startsWith('ev_memo_'))allMemos.push({user_id:uid,project_id:k.slice(8),week:0,content:v});
+        else if(k.startsWith('te_memo_'))allMemos.push({user_id:uid,project_id:'te_'+k.slice(8),week:0,content:v});
+        else if(k.startsWith('travel_'))allMemos.push({user_id:uid,project_id:k,week:0,content:v});
+        else{const parts=k.split('_');const week=parseInt(parts[parts.length-1]);if(!isNaN(week))allMemos.push({user_id:uid,project_id:parts.slice(0,-1).join('_'),week,content:v});}
+      });
+      Object.entries(d.haegobjMemos||{}).forEach(([ds,v])=>{
+        allMemos.push({user_id:uid,project_id:'haegobj_'+ds,week:0,content:v});
+      });
+      if(allMemos.length){
+        await sb.from('class_memos').delete().eq('user_id',uid);
+        // 50개씩 나눠서 insert
+        for(let i=0;i<allMemos.length;i+=50)
+          await sb.from('class_memos').insert(allMemos.slice(i,i+50));
+      }
       await loadAll();
       document.getElementById('backup-status').textContent='Restored ✓';
       setTimeout(()=>document.getElementById('backup-status').textContent='',3000);
@@ -2780,7 +2809,7 @@ async function importData(e){
   reader.readAsText(file);
 }
 function exportData(){
-  const obj={projects:data.projects,timedCats:data.timedCats,timedEvents:data.timedEvents,projEvents:data.projEvents,tasks:data.tasks,golf:data.golf,office:data.office,cellColors:data.cellColors,anniversaries:data.anniversaries,periodLogs:data.periodLogs,homeNote:data.homeNote,classMemos:data.classMemos,projOrder:data.projOrder,exportedAt:new Date().toISOString()};
+  const obj={projects:data.projects,timedCats:data.timedCats,timedEvents:data.timedEvents,projEvents:data.projEvents,tasks:data.tasks,golf:data.golf,office:data.office,cellColors:data.cellColors,cellEmojis:data.cellEmojis||{},anniversaries:data.anniversaries,periodLogs:data.periodLogs,travels:data.travels,homeNote:data.homeNote,classMemos:data.classMemos,haegobjMemos:data.haegobjMemos||{},projOrder:data.projOrder,exportedAt:new Date().toISOString()};
   const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='jinhae_schedule_'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(a.href);
 }
@@ -2802,7 +2831,15 @@ window.addEventListener('popstate',()=>{
   }
   const sb=document.getElementById('sidebar');
   if(sb&&sb.classList.contains('open')){closeSb();return;}
+  // 깊은 뷰에서 뒤로가기 → 이전 뷰로
   if(state.view==='day'){setView('month');return;}
+  if(state.view==='filtered'){
+    state.projFilter=null;state.timedFilter=null;state.filterMode=null;
+    setView('month');return;
+  }
+  if(['travel','tasks','todos','haegobj','golf','studio','period'].includes(state.view)){
+    setView('home');return;
+  }
 });
 let _tx=0,_ty=0;
 document.addEventListener('wheel',e=>{if(e.target.closest('.modal-overlay,.sidebar,.work-time-inp,input,textarea,select'))return;clearTimeout(window._wt);window._wt=setTimeout(()=>navigate(e.deltaY>0?1:-1),80);},{passive:true});
