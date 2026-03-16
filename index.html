@@ -743,6 +743,9 @@ function setSyncing(){
 function setSynced(){document.getElementById('sync-dot').className='sync-dot';document.getElementById('sync-txt').textContent='Synced';}
 function setSyncErr(m){document.getElementById('sync-dot').className='sync-dot error';document.getElementById('sync-txt').textContent=m||'Error';}
 
+// ── Pending Writes Counter ───────────────────────────────
+let pendingWrites=0;
+
 // ── Pending Retry Queue ───────────────────────────────────
 const _retryQueue=[];
 let _retryTimer=null;
@@ -894,95 +897,156 @@ async function loadAll(){
 
 // ── Save functions ────────────────────────────────────────
 async function saveTimedEvent(te){
+  pendingWrites++;
   setSyncing();
-  const{error}=await sb.from('timed_events').upsert({id:te.id,user_id:currentUser.id,title:te.title,date:te.date,time:te.time,category_id:te.categoryId||null});
-  if(error){setSyncErr('Save Error');return error.message;}setSynced();return null;
+  try{
+    const{error}=await sb.from('timed_events').upsert({id:te.id,user_id:currentUser.id,title:te.title,date:te.date,time:te.time,category_id:te.categoryId||null});
+    if(error){setSyncErr('Save Error');return error.message;}setSynced();return null;
+  }finally{pendingWrites--;}
 }
 async function delTimedEvent(id,backup){
+  pendingWrites++;
   setSyncing();
-  const{error}=await sb.from('timed_events').delete().eq('id',id).eq('user_id',currentUser.id);
-  if(error){if(backup)data.timedEvents.push(backup);renderAll();setSyncErr('Delete Error');alert('Delete failed');}
-  else setSynced();
+  try{
+    const{error}=await sb.from('timed_events').delete().eq('id',id).eq('user_id',currentUser.id);
+    if(error){if(backup)data.timedEvents.push(backup);renderAll();setSyncErr('Delete Error');alert('Delete failed');}
+    else setSynced();
+  }finally{pendingWrites--;}
 }
 async function saveProjEvent(ev){
+  pendingWrites++;
   setSyncing();
-  const{error}=await sb.from('events').upsert({id:ev.id,user_id:currentUser.id,title:ev.title,date:ev.date,start:ev.start||null,end:null,project_id:ev.projectId||null,color:ev.color||null,note:ev.note||null});
-  if(error){setSyncErr('Save Error');return error.message;}setSynced();return null;
+  try{
+    const{error}=await sb.from('events').upsert({id:ev.id,user_id:currentUser.id,title:ev.title,date:ev.date,start:ev.start||null,end:null,project_id:ev.projectId||null,color:ev.color||null,note:ev.note||null});
+    if(error){setSyncErr('Save Error');return error.message;}setSynced();return null;
+  }finally{pendingWrites--;}
 }
 async function delProjEvent(id,backup,subBackup){
+  pendingWrites++;
   setSyncing();
-  const{error}=await sb.from('events').delete().eq('id',id).eq('user_id',currentUser.id);
-  if(error){
-    if(backup)data.projEvents.push(backup);
-    if(subBackup&&subBackup.length)data.tasks.push(...subBackup);
-    renderAll();setSyncErr('Delete Error');alert('Delete failed');
-  } else {
-    // 이벤트 삭제 성공 시 연결된 tasks도 DB에서 삭제
-    if(subBackup&&subBackup.length){
-      await sb.from('todos').delete().in('id',subBackup.map(t=>t.id)).eq('user_id',currentUser.id);
+  try{
+    const{error}=await sb.from('events').delete().eq('id',id).eq('user_id',currentUser.id);
+    if(error){
+      if(backup)data.projEvents.push(backup);
+      if(subBackup&&subBackup.length)data.tasks.push(...subBackup);
+      renderAll();setSyncErr('Delete Error');alert('Delete failed');
+    } else {
+      if(subBackup&&subBackup.length){
+        await sb.from('todos').delete().in('id',subBackup.map(t=>t.id)).eq('user_id',currentUser.id);
+      }
+      setSynced();
     }
-    setSynced();
-  }
+  }finally{pendingWrites--;}
 }
 async function saveTask(td){
+  pendingWrites++;
   setSyncing();
-  const{error}=await sb.from('todos').upsert({id:td.id,user_id:currentUser.id,title:td.title,date:td.date||null,project_id:td.projectId||null,done:td.done,event_id:td.eventId||null});
-  if(error){setSyncErr('Save Error');return error.message;}setSynced();return null;
+  try{
+    const{error}=await sb.from('todos').upsert({id:td.id,user_id:currentUser.id,title:td.title,date:td.date||null,project_id:td.projectId||null,done:td.done,event_id:td.eventId||null});
+    if(error){setSyncErr('Save Error');return error.message;}setSynced();return null;
+  }finally{pendingWrites--;}
 }
 async function delTask(id){
   const backup=data.tasks.find(t=>t.id===id);
+  pendingWrites++;
   setSyncing();
-  const{error}=await sb.from('todos').delete().eq('id',id).eq('user_id',currentUser.id);
-  if(error){
-    if(backup)data.tasks.push(backup);
-    setSyncErr('Delete Error');
-    enqueueRetry(()=>delTask(id),'delTask:'+id);
-  } else { setSynced(); }
+  try{
+    const{error}=await sb.from('todos').delete().eq('id',id).eq('user_id',currentUser.id);
+    if(error){
+      if(backup)data.tasks.push(backup);
+      setSyncErr('Delete Error');
+      enqueueRetry(()=>delTask(id),'delTask:'+id);
+    } else { setSynced(); }
+  }finally{pendingWrites--;}
 }
-async function saveProj(p){setSyncing();const{error}=await sb.from('projects').upsert({id:p.id,user_id:currentUser.id,name:p.name,color:p.color});if(error)setSyncErr('Save Error');else setSynced();}
-async function delProj(id){setSyncing();await sb.from('projects').delete().eq('id',id).eq('user_id',currentUser.id);setSynced();}
-async function saveGolfRec(ds,rec){
+async function saveProj(p){
+  pendingWrites++;
   setSyncing();
-  const{error}=rec?await sb.from('golf').upsert({user_id:currentUser.id,date:ds,rounds:rec.rounds||[],weather:rec.weather||''},{onConflict:'user_id,date'}):await sb.from('golf').delete().eq('date',ds).eq('user_id',currentUser.id);
-  if(error)setSyncErr('Save Error');else setSynced();
+  try{
+    const{error}=await sb.from('projects').upsert({id:p.id,user_id:currentUser.id,name:p.name,color:p.color});
+    if(error)setSyncErr('Save Error');else setSynced();
+  }finally{pendingWrites--;}
+}
+async function delProj(id){
+  pendingWrites++;
+  setSyncing();
+  try{
+    await sb.from('projects').delete().eq('id',id).eq('user_id',currentUser.id);
+    setSynced();
+  }finally{pendingWrites--;}
+}
+async function saveGolfRec(ds,rec){
+  pendingWrites++;
+  setSyncing();
+  try{
+    const{error}=rec?await sb.from('golf').upsert({user_id:currentUser.id,date:ds,rounds:rec.rounds||[],weather:rec.weather||''},{onConflict:'user_id,date'}):await sb.from('golf').delete().eq('date',ds).eq('user_id',currentUser.id);
+    if(error)setSyncErr('Save Error');else setSynced();
+  }finally{pendingWrites--;}
 }
 async function saveOfficeRec(ds,rec){
+  pendingWrites++;
   setSyncing();
-  const{error}=rec&&(rec.in||rec.out)?await sb.from('office').upsert({user_id:currentUser.id,date:ds,time_in:rec.in||'',time_out:rec.out||''},{onConflict:'user_id,date'}):await sb.from('office').delete().eq('date',ds).eq('user_id',currentUser.id);
-  if(error)setSyncErr('Save Error');else setSynced();
+  try{
+    const{error}=rec&&(rec.in||rec.out)?await sb.from('office').upsert({user_id:currentUser.id,date:ds,time_in:rec.in||'',time_out:rec.out||''},{onConflict:'user_id,date'}):await sb.from('office').delete().eq('date',ds).eq('user_id',currentUser.id);
+    if(error)setSyncErr('Save Error');else setSynced();
+  }finally{pendingWrites--;}
 }
 async function saveCellColor(ds,color){
+  pendingWrites++;
   setSyncing();
-  const{error}=color?await sb.from('cell_colors').upsert({user_id:currentUser.id,date:ds,color}):await sb.from('cell_colors').delete().eq('date',ds).eq('user_id',currentUser.id);
-  if(error)setSyncErr('Save Error');else setSynced();
+  try{
+    const{error}=color?await sb.from('cell_colors').upsert({user_id:currentUser.id,date:ds,color}):await sb.from('cell_colors').delete().eq('date',ds).eq('user_id',currentUser.id);
+    if(error)setSyncErr('Save Error');else setSynced();
+  }finally{pendingWrites--;}
 }
 async function saveHomeNote(val){
+  pendingWrites++;
   setSyncing();
-  const{error}=await sb.from('home_notes').upsert({user_id:currentUser.id,note1:val},{onConflict:'user_id'});
-  if(error)setSyncErr('Save Error');else setSynced();
+  try{
+    const{error}=await sb.from('home_notes').upsert({user_id:currentUser.id,note1:val},{onConflict:'user_id'});
+    if(error)setSyncErr('Save Error');else setSynced();
+  }finally{pendingWrites--;}
 }
 async function saveEvMemo(id,val){
-  // id가 'te_xxx' 이면 timed event memo, 아니면 proj event memo
   const isTe=id.startsWith('te_');
   const realId=isTe?id.slice(3):id;
   const key=isTe?`te_memo_${realId}`:`ev_memo_${realId}`;
   data.classMemos[key]=val;
-  // DB: project_id = realId, week = 0 (te는 te_ prefix 붙여서 구분)
   const pid=isTe?`te_${realId}`:realId;
+  pendingWrites++;
   setSyncing();
-  const{error}=await sb.from('class_memos').upsert(
-    {user_id:currentUser.id,project_id:pid,week:0,content:val},
-    {onConflict:'user_id,project_id,week'}
-  );
-  if(error)setSyncErr('Save Error');else setSynced();
+  try{
+    const{error}=await sb.from('class_memos').upsert(
+      {user_id:currentUser.id,project_id:pid,week:0,content:val},
+      {onConflict:'user_id,project_id,week'}
+    );
+    if(error)setSyncErr('Save Error');else setSynced();
+  }finally{pendingWrites--;}
 }
 async function saveClassMemo(pid,week,content){
+  pendingWrites++;
   setSyncing();
-  const{error}=await sb.from('class_memos').upsert({user_id:currentUser.id,project_id:pid,week,content},{onConflict:'user_id,project_id,week'});
-  if(error)setSyncErr('Save Error');else setSynced();
+  try{
+    const{error}=await sb.from('class_memos').upsert({user_id:currentUser.id,project_id:pid,week,content},{onConflict:'user_id,project_id,week'});
+    if(error)setSyncErr('Save Error');else setSynced();
+  }finally{pendingWrites--;}
 }
-async function savePeriodLog(log){setSyncing();const{error}=await sb.from('period_logs').insert({id:log.id,user_id:currentUser.id,start_date:log.startDate});if(error)setSyncErr('Save Error');else setSynced();}
-async function delPeriodLog(id){setSyncing();await sb.from('period_logs').delete().eq('id',id).eq('user_id',currentUser.id);setSynced();}
+async function savePeriodLog(log){
+  pendingWrites++;
+  setSyncing();
+  try{
+    const{error}=await sb.from('period_logs').insert({id:log.id,user_id:currentUser.id,start_date:log.startDate});
+    if(error)setSyncErr('Save Error');else setSynced();
+  }finally{pendingWrites--;}
+}
+async function delPeriodLog(id){
+  pendingWrites++;
+  setSyncing();
+  try{
+    await sb.from('period_logs').delete().eq('id',id).eq('user_id',currentUser.id);
+    setSynced();
+  }finally{pendingWrites--;}
+}
 // ── Navigation ────────────────────────────────────────────
 function setView(v){
   state.view=v;
@@ -1585,12 +1649,15 @@ function saveHaegobjMemo(ds,val){
   data.haegobjMemos[ds]=val;
   clearTimeout(_haegobjTimer[ds]);
   _haegobjTimer[ds]=setTimeout(async()=>{
+    pendingWrites++;
     setSyncing();
-    const{error}=await sb.from('class_memos').upsert(
-      {user_id:currentUser.id,project_id:`haegobj_${ds}`,week:0,content:val},
-      {onConflict:'user_id,project_id,week'}
-    );
-    if(error)setSyncErr('Save Error');else setSynced();
+    try{
+      const{error}=await sb.from('class_memos').upsert(
+        {user_id:currentUser.id,project_id:`haegobj_${ds}`,week:0,content:val},
+        {onConflict:'user_id,project_id,week'}
+      );
+      if(error)setSyncErr('Save Error');else setSynced();
+    }finally{pendingWrites--;}
   },1000);
 }
 
@@ -3016,10 +3083,8 @@ let _reloadDebounceTimer=null;
 const RELOAD_COOLDOWN=4000; // 4초 이내 재실행 skip
 
 async function reloadOnResume(){
-  // 저장 중이면 skip (sync-dot가 syncing 상태인지 확인)
-  const dot=document.getElementById('sync-dot');
-  const isSaving=dot&&dot.classList.contains('syncing');
-  if(!currentUser||_reloadInProgress||isSaving)return;
+  // 저장 진행 중인 요청이 있으면 skip
+  if(!currentUser||_reloadInProgress||pendingWrites>0)return;
   // 쿨다운: 마지막 reload로부터 RELOAD_COOLDOWN ms 이내면 skip
   const now=Date.now();
   if(now-_lastReloadAt<RELOAD_COOLDOWN)return;
