@@ -549,7 +549,9 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 // ── Supabase ──────────────────────────────────────────────
 const SB_URL='https://xrhmqumgskdmwklihhva.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhyaG1xdW1nc2tkbXdrbGloaHZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNzYzODEsImV4cCI6MjA4ODk1MjM4MX0.Ozndx_hEm_x1xN18a6CPkArEWHCgVGZQpcaClto9FDk';
-const sb=supabase.createClient(SB_URL,SB_KEY);
+const sb=supabase.createClient(SB_URL,SB_KEY,{
+  auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}
+});
 let currentUser=null;
 
 // ── Constants ─────────────────────────────────────────────
@@ -643,7 +645,18 @@ function initTheme(){
 }
 
 // ── Sync ──────────────────────────────────────────────────
-function setSyncing(){document.getElementById('sync-dot').className='sync-dot syncing';document.getElementById('sync-txt').textContent='Syncing...';}
+let _syncTimer=null;
+function setSyncing(){
+  document.getElementById('sync-dot').className='sync-dot syncing';
+  document.getElementById('sync-txt').textContent='Syncing...';
+  // 10초 후 자동 리셋 (멈춤 방지)
+  clearTimeout(_syncTimer);
+  _syncTimer=setTimeout(()=>{
+    if(document.getElementById('sync-dot').classList.contains('syncing')){
+      setSynced();
+    }
+  },10000);
+}
 function setSynced(){document.getElementById('sync-dot').className='sync-dot';document.getElementById('sync-txt').textContent='Synced';}
 function setSyncErr(m){document.getElementById('sync-dot').className='sync-dot error';document.getElementById('sync-txt').textContent=m||'Error';}
 
@@ -2815,6 +2828,33 @@ function exportData(){
 }
 
 // ── History & Mobile ──────────────────────────────────────
+// 탭 복귀시 동기화 상태 리셋
+document.addEventListener('visibilitychange',async()=>{
+  if(document.visibilityState==='visible'){
+    // 동기화 중에 멈춰있으면 리셋
+    if(document.getElementById('sync-dot')?.classList.contains('syncing')){
+      setSynced();
+    }
+    // 세션 유효성 확인
+    if(sb&&currentUser){
+      try{
+        const{data:{session}}=await sb.auth.getSession();
+        if(!session){
+          // 세션 만료 - 조용히 재로그인 시도
+          const{data}=await sb.auth.refreshSession();
+          if(!data.session){
+            // 재로그인 필요
+            document.getElementById('app').style.display='none';
+            document.getElementById('login-screen').style.display='flex';
+          }
+        }
+      }catch(e){
+        setSynced(); // 에러여도 멈추지 않게
+      }
+    }
+  }
+});
+
 function setupHistory(){
   if(!history.state||!history.state.app){
     history.replaceState({app:true},'',window.location.href);
