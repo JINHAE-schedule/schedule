@@ -1,0 +1,2903 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>JINHAE Schedule</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#F7F7F5;--surface:#fff;--surface2:#F2F2F0;
+  --border:#E8E8E5;--border2:#D4D4D0;
+  --text:#1A1A18;--text2:#5A5A55;--text3:#9A9A95;
+  --accent:#2D6BE4;--accent-bg:#EEF4FF;--accent-txt:#1D4ED8;
+  --red:#DC2626;--red-bg:#FEF2F2;
+  --green:#16A34A;--green-bg:#F0FDF4;--green-txt:#15803D;
+  --pink:#EC4899;--pink-bg:#FDF2F8;
+  --radius:12px;--radius-sm:8px;--radius-xs:5px;
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px rgba(0,0,0,.04);
+  --shadow-lg:0 8px 32px rgba(0,0,0,.12);
+  --sb:220px;--tb:52px;
+  --font:'Noto Sans KR',sans-serif;--font-ui:'DM Sans','Noto Sans KR',sans-serif;
+}
+[data-theme=dark]{
+  --bg:#141412;--surface:#1E1E1C;--surface2:#262624;
+  --border:#2E2E2C;--border2:#3A3A38;
+  --text:#F0F0EC;--text2:#A8A8A4;--text3:#606060;
+  --accent:#4D8BF4;--accent-bg:#1A2640;--accent-txt:#93B8FA;
+  --red:#EF4444;--red-bg:#2D1515;
+  --green:#22C55E;--green-bg:#142014;--green-txt:#4ADE80;
+  --pink:#F472B6;--pink-bg:#2D1525;
+  --shadow:0 1px 3px rgba(0,0,0,.3),0 4px 12px rgba(0,0,0,.2);
+  --shadow-lg:0 8px 32px rgba(0,0,0,.4);
+}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;-webkit-font-smoothing:antialiased;overflow-x:hidden;overscroll-behavior-y:none;}
+
+/* Login */
+#login-screen{display:none;position:fixed;inset:0;background:var(--bg);align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:20px;}
+.login-logo{font-family:var(--font-ui);font-size:28px;font-weight:600;letter-spacing:-.5px;}
+.login-logo span{color:var(--accent);}
+.login-sub{font-size:13px;color:var(--text3);}
+.login-btn{display:flex;align-items:center;gap:10px;padding:12px 24px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);cursor:pointer;font-size:14px;font-family:var(--font);color:var(--text);box-shadow:var(--shadow);transition:box-shadow .15s;}
+.login-btn:hover{box-shadow:var(--shadow-lg);}
+.login-loading{font-size:12px;color:var(--text3);}
+
+/* App shell */
+#app{display:none;height:100vh;flex-direction:column;}
+
+/* Topbar */
+.topbar{height:var(--tb);display:flex;align-items:center;padding:0 14px;gap:8px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;z-index:100;}
+.ham-btn{display:none;align-items:center;justify-content:center;background:none;border:1px solid var(--border2);border-radius:var(--radius-xs);padding:6px 8px;cursor:pointer;font-size:15px;color:var(--text2);}
+.tb-nav{padding:5px 10px;background:none;border:1px solid var(--border2);border-radius:var(--radius-xs);cursor:pointer;font-size:12px;font-family:var(--font-ui);color:var(--text2);}
+.tb-nav:hover{background:var(--surface2);}
+.tb-title{flex:1;font-size:13px;font-weight:500;font-family:var(--font-ui);text-align:center;}
+.tb-btn{padding:6px 12px;background:none;border:1px solid var(--border2);border-radius:var(--radius-xs);cursor:pointer;font-size:12px;font-family:var(--font);color:var(--text2);}
+.tb-btn:hover{background:var(--surface2);}
+#sync-status{display:none;align-items:center;gap:5px;font-size:11px;color:var(--text3);}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green);}
+.sync-dot.syncing{background:var(--accent);animation:pulse 1s infinite;}
+.sync-dot.error{background:var(--red);}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+/* Body */
+.body{flex:1;display:flex;overflow:hidden;}
+
+/* Sidebar */
+.sidebar{width:var(--sb);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;position:fixed;top:0;left:0;height:100vh;z-index:150;}
+.sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:199;}
+.sb-header{padding:14px 14px 8px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.sb-logo{font-family:var(--font-ui);font-size:15px;font-weight:600;letter-spacing:-.3px;}
+.sb-logo span{color:var(--accent);}
+.sb-user{display:flex;align-items:center;gap:7px;margin-top:9px;}
+.sb-avatar{width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0;}
+.sb-name{font-size:11px;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sb-logout{background:none;border:1px solid var(--border2);border-radius:var(--radius-xs);padding:2px 7px;cursor:pointer;font-size:10px;font-family:var(--font-ui);color:var(--text3);}
+.sb-logout:hover{color:var(--red);border-color:var(--red);}
+.nav-sec{padding:7px 10px 3px;}
+.nav-lbl{font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.8px;text-transform:uppercase;padding:0 6px;margin-bottom:2px;display:flex;align-items:center;justify-content:space-between;}
+.nav-lbl-btn{background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;line-height:1;padding:0 2px;border-radius:3px;}
+.nav-lbl-btn:hover{color:var(--accent);background:var(--accent-bg);}
+.nav-btn{width:100%;display:flex;align-items:center;gap:7px;padding:5px 8px;background:none;border:none;border-radius:var(--radius-xs);cursor:pointer;font-size:12px;font-family:var(--font);color:var(--text2);text-align:left;transition:background .1s;}
+.nav-btn:hover{background:var(--surface2);}
+.nav-btn.active{background:var(--accent-bg);color:var(--accent-txt);font-weight:500;}
+.nav-icon{font-size:13px;width:16px;text-align:center;flex-shrink:0;}
+.nav-div{height:1px;background:var(--border);margin:3px 10px;}
+.proj-btn{width:100%;display:flex;align-items:center;gap:7px;padding:4px 8px;background:none;border:none;border-radius:var(--radius-xs);cursor:pointer;font-size:12px;font-family:var(--font);color:var(--text2);text-align:left;transition:background .1s;}
+.proj-btn:hover{background:var(--surface2);}
+.proj-btn.active{background:var(--accent-bg);color:var(--accent-txt);}
+.proj-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.proj-cnt{margin-left:auto;font-size:10px;color:var(--text3);background:var(--surface2);padding:1px 5px;border-radius:8px;}
+
+/* Main */
+.main{flex:1;overflow-y:auto;overflow-x:hidden;margin-left:var(--sb);}
+.content{padding:14px;max-width:1200px;margin:0 auto;}
+.filter-bar{display:none;padding:5px 14px;background:var(--surface);border-bottom:1px solid var(--border);align-items:center;gap:8px;font-size:12px;}
+.filter-chip{padding:2px 10px;border-radius:12px;color:#fff;font-size:11px;font-weight:500;}
+#backup-status{padding:3px 14px;font-size:11px;color:var(--text3);min-height:18px;}
+
+/* Card */
+.card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
+
+/* Month calendar */
+.month-view{border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);width:100%;}
+.month-hdr{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:var(--surface2);}
+.month-dow{padding:7px 4px;text-align:center;font-size:11px;font-weight:600;font-family:var(--font-ui);color:var(--text3);}
+.month-dow.sat{color:var(--accent);}
+.month-dow.sun{color:var(--red);}
+.month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));}
+.month-cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:5px 5px;cursor:pointer;transition:background .1s;background:var(--surface);min-height:96px;min-width:0;overflow:hidden;}
+.month-cell:hover{background:var(--accent-bg);}
+.month-cell.other{opacity:.35;cursor:default;background:var(--surface2);}
+.month-cell.other:hover{background:var(--surface2);}
+.month-cell.today{background:rgba(45,107,228,.04);}
+.month-cell.selected{outline:2px solid var(--accent);outline-offset:-2px;}
+.month-cell-num{font-size:11px;font-weight:500;color:var(--text2);margin-bottom:2px;display:flex;align-items:baseline;flex-wrap:wrap;gap:1px;line-height:1.4;}
+.month-ev{font-size:10px;padding:1px 5px;border-radius:3px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
+.cell-dot{width:5px;height:5px;border-radius:50%;display:inline-block;margin-left:2px;vertical-align:middle;}
+
+/* Year */
+.year-view{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.year-mini{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;}
+.year-dow{font-size:8px;color:var(--text3);text-align:center;padding:2px 0;font-family:var(--font-ui);}
+.year-day{font-size:9px;text-align:center;padding:2px 1px;border-radius:3px;cursor:pointer;color:var(--text2);}
+.year-day:hover{background:var(--accent-bg);color:var(--accent);}
+.year-day.today{background:var(--accent);color:#fff;border-radius:50%;}
+.year-day.has-ev{font-weight:600;color:var(--text);}
+.year-day.sat{color:var(--accent);}
+.year-day.sun{color:var(--red);}
+.year-day.other{opacity:.2;}
+
+/* Day view */
+.day-view{display:flex;flex-direction:column;gap:12px;}
+
+/* Work */
+.work-layout{display:grid;grid-template-columns:1fr 210px;gap:16px;align-items:start;}
+.work-cal-hdr{display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--border);}
+.work-grid{display:grid;grid-template-columns:repeat(7,1fr);}
+.work-dow{padding:6px 4px;text-align:center;font-size:11px;font-weight:600;font-family:var(--font-ui);color:var(--text3);}
+.work-dow.sat{color:var(--accent);}
+.work-dow.sun{color:var(--red);}
+.work-cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:5px 5px;min-height:90px;overflow:hidden;}
+.work-cell.empty{background:var(--surface2);opacity:.4;}
+.work-cell.today .work-num{color:var(--accent);font-weight:700;}
+.work-cell.sat .work-num{color:var(--accent);}
+.work-cell.sun .work-num{color:var(--red);}
+.work-cell.golf-worked{background:#FEF3DC;}
+.work-cell.worked{background:#E0F5FA;}
+.work-cell.period-day{background:var(--pink-bg);}
+.work-num{font-size:11px;color:var(--text2);font-weight:500;line-height:1;}
+.work-bar-bg{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;margin-top:4px;}
+.work-bar-fill{height:100%;border-radius:3px;transition:width .3s;}
+.work-time-inp{width:100%;padding:3px 4px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:11px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font);}
+.work-time-inp:focus{border-color:var(--accent);}
+.work-hr-lbl{font-size:9px;color:var(--text3);margin-top:1px;text-align:right;}
+
+/* Golf cells */
+.golf-cell{min-height:90px;cursor:pointer;}
+.golf-empty{font-size:16px;color:var(--text3);text-align:center;padding:6px 0;cursor:pointer;}
+.golf-empty:hover{color:#BA7517;}
+.golf-round-tag{display:flex;align-items:center;gap:3px;font-size:10px;margin-bottom:2px;}
+.golf-holes{background:#FEF3DC;color:#BA7517;padding:1px 4px;border-radius:3px;font-weight:600;}
+.golf-add{font-size:11px;color:var(--text3);text-align:center;cursor:pointer;padding:1px 0;}
+.golf-add:hover{color:#BA7517;}
+.golf-hole-btn{padding:3px 8px;border:1px solid var(--border2);border-radius:var(--radius-xs);background:none;cursor:pointer;font-size:11px;font-family:var(--font);color:var(--text2);}
+.golf-hole-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.golf-hole-custom{width:50px;padding:3px 6px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:11px;background:var(--bg);color:var(--text);outline:none;}
+.golf-amt{width:100%;padding:5px 8px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;}
+.golf-amt:focus{border-color:var(--accent);}
+.golf-wx-btn{width:36px;height:36px;font-size:18px;background:var(--surface2);border:2px solid transparent;border-radius:var(--radius-xs);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.golf-wx-btn.active{border-color:var(--accent);background:var(--accent-bg);}
+
+/* Modals */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(2px);}
+.modal{background:var(--surface);border-radius:var(--radius);padding:22px;width:420px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);}
+.modal-title{font-size:15px;font-weight:600;margin-bottom:14px;font-family:var(--font-ui);}
+.form-grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;padding-top:14px;border-top:1px solid var(--border);position:sticky;bottom:0;background:var(--surface);padding-bottom:2px;}
+.form-row{margin-bottom:11px;}
+.form-row label{display:block;font-size:10px;font-weight:600;color:var(--text3);margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px;}
+.form-row input,.form-row select,.form-row textarea{width:100%;padding:7px 10px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:13px;font-family:var(--font);background:var(--bg);color:var(--text);outline:none;transition:border-color .1s;}
+.form-row input:focus,.form-row select:focus,.form-row textarea:focus{border-color:var(--accent);}
+.form-row textarea{resize:vertical;min-height:70px;line-height:1.6;}
+.btn-save{padding:7px 16px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-xs);cursor:pointer;font-size:13px;font-family:var(--font);font-weight:500;}
+.btn-save:hover{opacity:.9;}
+.btn-cancel{padding:7px 12px;background:none;border:1px solid var(--border2);border-radius:var(--radius-xs);cursor:pointer;font-size:13px;font-family:var(--font);color:var(--text2);}
+.btn-cancel:hover{background:var(--surface2);}
+.btn-del{padding:7px 12px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-bg);border-radius:var(--radius-xs);cursor:pointer;font-size:13px;font-family:var(--font);}
+.btn-del:hover{border-color:var(--red);}
+.color-row{display:flex;flex-wrap:wrap;gap:5px;}
+.color-sw{width:20px;height:20px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .1s;flex-shrink:0;}
+.color-sw:hover{transform:scale(1.15);}
+.color-sw.selected{border-color:var(--text);transform:scale(1.1);}
+.cell-color-picker{position:fixed;z-index:2000;background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius);box-shadow:var(--shadow-lg);padding:10px;width:172px;}
+
+/* Todos */
+.todo-item{display:flex;align-items:center;gap:8px;padding:5px 14px;}
+.todo-item:hover{background:var(--surface2);}
+.todo-cb{accent-color:var(--accent);cursor:pointer;flex-shrink:0;}
+.todo-txt{flex:1;font-size:13px;line-height:1.4;}
+.todo-txt.done{text-decoration:line-through;color:var(--text3);}
+.todo-del{background:none;border:none;cursor:pointer;color:var(--text3);font-size:11px;padding:2px 4px;}
+.todo-del:hover{color:var(--red);}
+.quick-add{display:flex;gap:8px;padding:9px 14px;border-top:1px solid var(--border);}
+.quick-add input{flex:1;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:13px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font);}
+.quick-add input:focus{border-color:var(--accent);}
+.quick-add button{padding:6px 12px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-xs);cursor:pointer;font-size:16px;}
+.empty{padding:18px;text-align:center;font-size:13px;color:var(--text3);}
+
+/* Type tabs */
+.type-tabs{display:flex;gap:4px;margin-bottom:12px;}
+.type-tab{flex:1;padding:6px;border:1px solid var(--border2);border-radius:var(--radius-xs);background:none;cursor:pointer;font-size:12px;font-family:var(--font);color:var(--text2);text-align:center;}
+.type-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+/* Period */
+.period-cell-dot{font-size:10px;text-align:center;color:var(--pink);}
+
+/* Class memo table */
+.class-memo-table{width:100%;border-collapse:collapse;}
+.class-memo-table th{font-size:11px;color:var(--text3);padding:6px 8px;text-align:left;border-bottom:1px solid var(--border);font-weight:600;}
+.class-memo-table td{padding:4px 8px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.class-memo-inp{width:100%;padding:5px 7px;border:1px solid transparent;border-radius:var(--radius-xs);font-size:12px;background:transparent;color:var(--text);outline:none;font-family:var(--font);}
+.class-memo-inp:focus{border-color:var(--accent);background:var(--bg);}
+
+/* Studio save row */
+.studio-save-row{display:flex;gap:4px;margin-top:4px;}
+.studio-save-btn{flex:1;padding:3px 6px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-xs);cursor:pointer;font-size:10px;font-family:var(--font);}
+.studio-del-btn{padding:3px 6px;background:var(--red-bg);color:var(--red);border:1px solid var(--red-bg);border-radius:var(--radius-xs);cursor:pointer;font-size:10px;font-family:var(--font);}
+
+@media print{.sidebar,.topbar,#sync-status,.modal-overlay,.filter-bar,#backup-status{display:none !important;}.body{display:block !important;}.main{overflow:visible !important;}.content{padding:0 !important;}body{background:#fff !important;}.card{box-shadow:none !important;border:1px solid #ddd !important;}}
+
+@media(max-width:768px){
+  .sidebar{position:fixed;top:0;left:0;height:100vh;z-index:200;transform:translateX(-100%);transition:transform .25s ease;box-shadow:4px 0 20px rgba(0,0,0,.15);}
+  .main{margin-left:0 !important;}
+  .home-grid{grid-template-columns:1fr !important;}
+  /* M-1: 일간뷰 타임블록+태스크 세로 - 태스크 위, 타임블록 아래 */
+  .day-tb-grid{grid-template-columns:1fr !important;}
+  .day-task-col{order:-1 !important;}
+  .day-tb-col{order:1 !important;}
+  /* M-3: 투두 세로 */
+  .todos-grid{grid-template-columns:1fr !important;}
+  /* M-4: HAEGOBJ 세로 */
+  .haegobj-weeks{flex-direction:column !important;}
+  .haegobj-weeks > div{width:100% !important;}
+  /* M-1: 달력 가독성 */
+  .month-cell{min-height:90px !important;padding:3px 2px !important;}
+  .month-cell-num{font-size:10px !important;}
+  .month-ev{font-size:9px !important;padding:1px 3px !important;margin-bottom:1px !important;}
+  .month-dow{font-size:10px !important;padding:3px 2px !important;}
+  .month-hdr div{font-size:10px !important;}
+  .sidebar.open{transform:translateX(0);}
+  .sb-overlay.open{display:block;}
+  .ham-btn{display:flex !important;}
+  .work-layout{grid-template-columns:1fr !important;}
+  .work-cell{min-height:52px !important;}
+  .year-view{grid-template-columns:repeat(2,1fr) !important;}
+  .modal{width:100% !important;max-width:100vw !important;border-radius:var(--radius) var(--radius) 0 0 !important;margin:0 !important;}
+  .modal-overlay{align-items:flex-end !important;}
+  .modal-footer{position:sticky;bottom:0;}
+  .btn-save,.btn-cancel,.btn-del{min-height:44px;font-size:14px !important;}
+  input[type=time],input[type=date],input[type=number]{font-size:14px !important;}
+  input[type=text],select,textarea{font-size:12px !important;}
+  .content{padding:10px;}
+}
+</style>
+</head>
+<body>
+<!-- Login -->
+<div id="login-screen">
+  <div class="login-logo">JINHAE<span>.</span></div>
+  <div class="login-sub">Personal Schedule</div>
+  <button class="login-btn" onclick="signIn()">
+    <img src="https://www.google.com/favicon.ico" width="18" height="18" alt="G">
+    Google로 로그인
+  </button>
+  <div class="login-loading" id="login-loading"></div>
+</div>
+
+<!-- App -->
+<div id="app">
+  <div class="topbar">
+    <button class="ham-btn" onclick="toggleSb()">☰</button>
+    <div class="tb-title" id="main-title"></div>
+    <div id="sync-status"><div class="sync-dot" id="sync-dot"></div><span id="sync-txt">Synced</span></div>
+    <button class="tb-btn" onclick="exportData()" title="Backup">⬇</button>
+    <label class="tb-btn" style="cursor:pointer" title="Restore">⬆<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
+    <button class="tb-btn" onclick="window.print()">🖨</button>
+    <button class="tb-btn" onclick="toggleTheme()" id="theme-btn">🌙</button>
+  </div>
+
+  <div class="body">
+    <div class="sb-overlay" id="sb-overlay" onclick="closeSb()"></div>
+    <aside class="sidebar" id="sidebar">
+      <div class="sb-header">
+        <div class="sb-logo">JINHAE<span>.</span></div>
+        <div class="sb-user">
+          <div class="sb-avatar" id="user-avatar">J</div>
+          <span class="sb-name" id="user-name">Loading...</span>
+          <button class="sb-logout" onclick="signOut()">Sign out</button>
+        </div>
+      </div>
+
+      <div class="nav-sec">
+        <div class="nav-lbl">View</div>
+        <button class="nav-btn" data-view="home" onclick="setView('home')"><span class="nav-icon">🏠</span>Home</button>
+        <button class="nav-btn" data-view="year" onclick="setView('year')"><span class="nav-icon">◎</span>Year</button>
+        <button class="nav-btn" data-view="month" onclick="setView('month')"><span class="nav-icon">⊞</span>Month</button>
+        <button class="nav-btn" data-view="day" onclick="setView('day')"><span class="nav-icon">☀</span>Day</button>
+        <button class="nav-btn" onclick="openAnnivModal()"><span class="nav-icon">🎉</span>Anniversaries</button>
+      </div>
+      <div class="nav-div"></div>
+
+      <div class="nav-sec">
+        <div class="nav-lbl">Tasks</div>
+        <button class="nav-btn" data-view="tasks" onclick="setView('tasks')"><span class="nav-icon">📋</span>Task Calendar</button>
+        <button class="nav-btn" data-view="todos" onclick="setView('todos')"><span class="nav-icon">✓</span>Todo List</button>
+      </div>
+      <div class="nav-div"></div>
+
+      <div class="nav-sec">
+        <div class="nav-lbl">Timed Events<button class="nav-lbl-btn" onclick="openTimedCatModal()">+</button></div>
+        <button class="proj-btn" id="te-all-btn" onclick="setTimedFilter(null)">
+          <span class="proj-dot" style="background:var(--text3)"></span><span>All</span>
+          <span class="proj-cnt" id="te-all-cnt">0</span>
+        </button>
+        <div id="te-cat-list"></div>
+      </div>
+      <div class="nav-div"></div>
+
+      <div class="nav-sec">
+        <div class="nav-lbl">Projects<button class="nav-lbl-btn" onclick="openProjModal()">+</button></div>
+        <button class="proj-btn" id="proj-all-btn" onclick="setProjFilter(null)">
+          <span class="proj-dot" style="background:var(--text3)"></span><span>All</span>
+          <span class="proj-cnt" id="proj-all-cnt">0</span>
+        </button>
+        <div id="proj-nav-list"></div>
+      </div>
+      <div class="nav-div"></div>
+
+      <div class="nav-sec">
+        <div class="nav-lbl">Work</div>
+        <button class="nav-btn" data-view="haegobj" onclick="setView('haegobj')"><span class="nav-icon">👗</span>HAEGOBJ</button>
+        <button class="nav-btn" data-view="studio" onclick="setView('studio')"><span class="nav-icon" style="color:#0891B2">🏢</span>Studio</button>
+        <button class="nav-btn" data-view="golf" onclick="setView('golf')"><span class="nav-icon" style="color:#BA7517">⛳</span>Golf</button>
+      </div>
+      <div class="nav-div"></div>
+      <div class="nav-sec">
+        <div class="nav-lbl">Records</div>
+        <button class="nav-btn" data-view="travel" onclick="setView('travel')"><span class="nav-icon" style="color:#0891B2">✈️</span>Travel</button>
+        <button class="nav-btn" data-view="period" onclick="setView('period')"><span class="nav-icon" style="color:var(--pink)">🌸</span>Period</button>
+      </div>
+      <div id="backup-status"></div>
+    </aside>
+
+    <div class="main">
+      <div class="filter-bar" id="filter-bar"></div>
+      <div class="content" id="main-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modals ── -->
+<!-- Event Modal -->
+<div class="modal-overlay" id="modal" style="display:none" onclick="if(event.target.id==='modal')closeModal()">
+<div class="modal">
+  <div class="modal-title" id="modal-title">Add</div>
+  <div class="type-tabs">
+    <button class="type-tab active" id="tab-timed" onclick="setModalType('timed')">⏰ Timed Event</button>
+    <button class="type-tab" id="tab-proj" onclick="setModalType('proj')">📁 Project Event</button>
+    <button class="type-tab" id="tab-task" onclick="setModalType('task')">✓ Task</button>
+  </div>
+  <div class="form-row"><label>Title</label><input type="text" id="m-title" placeholder="Title"></div>
+  <div class="form-row" id="m-cat-row"><label>Category</label><select id="m-category"></select></div>
+  <div class="form-row" id="m-proj-row"><label>Project</label><select id="m-project"></select></div>
+  <div class="form-row"><label>Date</label><input type="date" id="m-date"></div>
+  <div class="form-row" id="m-time-row"><label>Time</label><input type="time" id="m-time" value="09:00" style="width:140px"></div>
+  <div class="form-row" id="m-color-row">
+    <label>Color <span style="font-size:10px;color:var(--text3);font-weight:400">(empty = project color)</span></label>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="color-row" id="color-swatches"></div>
+      <button onclick="pickColor('')" class="btn-cancel" style="font-size:11px;padding:3px 8px">Reset</button>
+    </div>
+  </div>
+  <div class="form-row"><label>Note</label><textarea id="m-note" placeholder="Notes..."></textarea></div>
+  <div id="m-subtasks-sec" style="display:none">
+    <div style="font-size:12px;color:var(--text2);font-weight:600;margin-bottom:6px">Subtasks</div>
+    <div id="m-subtasks-list"></div>
+    <div style="display:flex;gap:6px;margin-top:6px">
+      <input type="text" id="m-sub-inp" placeholder="+ Add subtask..." style="flex:1;padding:5px 8px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font)" onkeydown="if(event.key==='Enter')addSubtask()">
+      <button class="btn-save" onclick="addSubtask()" style="padding:5px 10px">Add</button>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-del" id="m-del-btn" style="display:none" onclick="deleteItem()">Delete</button>
+    <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+    <button class="btn-save" onclick="saveItem()">Save</button>
+  </div>
+</div>
+</div>
+
+<!-- Todo Panel -->
+<div class="modal-overlay" id="todo-panel" style="display:none" onclick="if(event.target.id==='todo-panel')closeTodoPanel()">
+<div class="modal" style="width:min(960px,95vw);max-height:90vh;display:flex;flex-direction:column;overflow:hidden;padding:0">
+  <!-- 헤더 -->
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0">
+    <div class="modal-title" style="margin-bottom:0">Todo List</div>
+    <div style="display:flex;gap:6px;align-items:center;margin-left:auto">
+      <button onclick="todoPanelNav(-1)" class="btn-cancel" style="padding:3px 10px;font-size:16px">‹</button>
+      <button onclick="todoPanelToday()" class="btn-cancel" style="padding:3px 10px;font-size:11px">Today</button>
+      <button onclick="todoPanelNav(1)" class="btn-cancel" style="padding:3px 10px;font-size:16px">›</button>
+      <button id="hide-done-btn" onclick="toggleHideDone()" class="btn-cancel" style="font-size:11px;padding:3px 10px;border-radius:12px;margin-left:6px">Hide Done</button>
+      <button onclick="closeTodoPanel()" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:20px;line-height:1;margin-left:4px">✕</button>
+    </div>
+  </div>
+  <!-- 3일 칸반 -->
+  <div style="flex:1;overflow:hidden;display:flex;gap:0" id="todo-panel-body"></div>
+</div>
+</div>
+
+<!-- Project Modal -->
+<div class="modal-overlay" id="proj-modal" style="display:none" onclick="if(event.target.id==='proj-modal')closeProjModal()">
+<div class="modal" style="width:480px">
+  <div class="modal-title">Projects</div>
+  <div id="proj-list-edit" style="margin-bottom:14px;max-height:300px;overflow-y:auto"></div>
+  <div style="border-top:1px solid var(--border);padding-top:12px">
+    <div style="display:flex;gap:7px;align-items:center;margin-bottom:8px">
+      <input type="text" id="new-proj-emoji" placeholder="🏷" maxlength="2" style="width:36px;padding:6px 3px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:15px;text-align:center;background:var(--bg);outline:none">
+      <input type="text" id="new-proj-name" placeholder="Project name" style="flex:1;padding:6px 10px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:13px;background:var(--bg);color:var(--text);outline:none">
+    </div>
+    <div id="new-proj-colors" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px"></div>
+    <button class="btn-save" onclick="addProject()" style="width:100%;padding:8px">Add Project</button>
+  </div>
+  <div class="modal-footer"><button class="btn-cancel" onclick="closeProjModal()">Close</button></div>
+</div>
+</div>
+
+<!-- Anniv Modal -->
+<div class="modal-overlay" id="anniv-modal" style="display:none" onclick="if(event.target.id==='anniv-modal')closeAnnivModal()">
+<div class="modal" style="width:460px">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div class="modal-title" style="margin-bottom:0">🎉 Anniversaries</div>
+    <button onclick="openAddAnniv()" class="btn-save" style="font-size:12px;padding:5px 12px">+ Add</button>
+  </div>
+  <div id="anniv-list" style="max-height:300px;overflow-y:auto;margin-bottom:12px"></div>
+  <div id="anniv-add-form" style="display:none;padding:12px;background:var(--surface2);border-radius:var(--radius-sm)">
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <input type="text" id="anniv-emoji" placeholder="🎂" maxlength="2" style="width:40px;padding:6px 3px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:15px;text-align:center;background:var(--bg);outline:none">
+      <input type="text" id="anniv-name" placeholder="Name" style="flex:1;padding:6px 8px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:13px;background:var(--bg);color:var(--text);outline:none">
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">
+      <input type="number" id="anniv-month" placeholder="MM" min="1" max="12" style="width:52px;padding:6px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:13px;background:var(--bg);color:var(--text);outline:none;text-align:center">
+      <span style="font-size:12px;color:var(--text2)">월</span>
+      <input type="number" id="anniv-day" placeholder="DD" min="1" max="31" style="width:52px;padding:6px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:13px;background:var(--bg);color:var(--text);outline:none;text-align:center">
+      <span style="font-size:12px;color:var(--text2)">일</span>
+      <input type="number" id="anniv-year" placeholder="Year (opt)" style="flex:1;padding:6px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:13px;background:var(--bg);color:var(--text);outline:none;text-align:center">
+      <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:var(--text2);cursor:pointer;white-space:nowrap">
+        <input type="checkbox" id="anniv-repeat" checked>매년
+      </label>
+    </div>
+    <div style="display:flex;gap:6px">
+      <button class="btn-cancel" onclick="closeAddAnniv()" style="flex:1">Cancel</button>
+      <button class="btn-save" onclick="saveAnniv()" style="flex:1">Add</button>
+    </div>
+  </div>
+  <div class="modal-footer"><button class="btn-cancel" onclick="closeAnnivModal()">Close</button></div>
+</div>
+</div>
+
+<!-- Timed Cat Modal -->
+<div class="modal-overlay" id="timed-cat-modal" style="display:none" onclick="if(event.target.id==='timed-cat-modal')closeTimedCatModal()">
+<div class="modal" style="width:400px">
+  <div class="modal-title">⏰ Timed Event Categories</div>
+  <div id="tc-list" style="max-height:240px;overflow-y:auto;margin-bottom:12px"></div>
+  <div style="padding:12px;background:var(--surface2);border-radius:var(--radius-sm)">
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <input type="text" id="tc-emoji" placeholder="💊" maxlength="2" style="width:36px;padding:6px 3px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:15px;text-align:center;background:var(--bg);outline:none">
+      <input type="text" id="tc-name" placeholder="Category name" style="flex:1;padding:6px 8px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:13px;background:var(--bg);color:var(--text);outline:none">
+    </div>
+    <div id="tc-colors" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px"></div>
+    <button class="btn-save" onclick="addTimedCat()" style="width:100%;padding:8px">Add Category</button>
+  </div>
+  <div class="modal-footer"><button class="btn-cancel" onclick="closeTimedCatModal()">Close</button></div>
+</div>
+</div>
+
+<!-- Golf Modal -->
+<div class="modal-overlay" id="golf-modal" style="display:none" onclick="if(event.target.id==='golf-modal')closeGolfModal()">
+<div class="modal" style="width:380px">
+  <div class="modal-title">⛳ <span id="golf-modal-date"></span></div>
+  <input type="hidden" id="golf-modal-ds">
+  <div style="margin-bottom:12px;padding:10px 12px;background:var(--surface2);border-radius:var(--radius-sm)">
+    <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:8px">Weather</div>
+    <div style="display:flex;gap:6px" id="golf-wx-btns">
+      <button class="golf-wx-btn" onclick="setGolfWx('☀️')">☀️</button>
+      <button class="golf-wx-btn" onclick="setGolfWx('⛅')">⛅</button>
+      <button class="golf-wx-btn" onclick="setGolfWx('🌧')">🌧</button>
+      <button class="golf-wx-btn" onclick="setGolfWx('⛄')">⛄</button>
+      <button class="golf-wx-btn" onclick="setGolfWx('💨')">💨</button>
+      <button class="golf-wx-btn" onclick="setGolfWx('🧢')">🧢</button>
+    </div>
+  </div>
+  <div id="golf-rounds"></div>
+  <button id="golf-add-round-btn" onclick="addGolfRound()" style="width:100%;margin-top:10px;padding:7px;border:1px dashed var(--border2);border-radius:var(--radius-sm);background:none;cursor:pointer;color:var(--text2);font-size:13px">+ Add 2nd Round</button>
+  <div class="form-row" style="margin-top:10px">
+    <label>메모</label>
+    <textarea id="golf-memo" rows="2" placeholder="" style="resize:none;font-family:var(--font)"></textarea>
+  </div>
+  <div class="modal-footer">
+    <button class="btn-del" onclick="clearGolfDay()">Delete</button>
+    <button class="btn-cancel" onclick="closeGolfModal()">Cancel</button>
+    <button class="btn-save" onclick="saveGolfModal()">Save</button>
+  </div>
+</div>
+</div>
+
+<!-- Studio Modal -->
+<div class="modal-overlay" id="studio-modal" style="display:none" onclick="if(event.target.id==='studio-modal')closeStudioModal()">
+<div class="modal" style="width:320px">
+  <div class="modal-title">🏢 <span id="studio-modal-date"></span></div>
+  <input type="hidden" id="studio-modal-ds">
+  <div class="form-row">
+    <label>출근</label>
+    <input type="time" id="studio-in" style="width:140px">
+  </div>
+  <div class="form-row">
+    <label>퇴근</label>
+    <input type="time" id="studio-out" style="width:140px">
+  </div>
+  <div class="modal-footer">
+    <button class="btn-del" id="studio-del-btn" style="display:none" onclick="studioModalDel()">Delete</button>
+    <button class="btn-cancel" onclick="closeStudioModal()">Cancel</button>
+    <button class="btn-save" onclick="studioModalSave()">Save</button>
+  </div>
+</div>
+</div>
+
+<!-- Travel Modal -->
+<div class="modal-overlay" id="travel-modal" style="display:none;z-index:1100" onclick="if(event.target.id==='travel-modal')closeTravelModal()">
+<div class="modal" style="width:420px">
+  <div class="modal-title" id="travel-modal-title">✈️ Add Travel</div>
+  <input type="hidden" id="travel-modal-id">
+  <div class="form-row"><label>여행 이름</label><input type="text" id="travel-name" placeholder="예: 도쿄 여행"></div>
+  <div class="form-row"><label>목적지</label><input type="text" id="travel-dest" placeholder="예: Japan, Tokyo"></div>
+  <div class="form-grid2">
+    <div class="form-row"><label>시작일</label><input type="date" id="travel-start"></div>
+    <div class="form-row"><label>종료일</label><input type="date" id="travel-end"></div>
+  </div>
+  <div class="form-row">
+    <label>색상</label>
+    <div class="color-row" id="travel-colors"></div>
+  </div>
+  <div class="form-row"><label>메모</label><textarea id="travel-memo" placeholder=""></textarea></div>
+  <div class="modal-footer">
+    <button class="btn-del" id="travel-del-btn" style="display:none" onclick="deleteTravel()">Delete</button>
+    <button class="btn-cancel" onclick="closeTravelModal()">Cancel</button>
+    <button class="btn-save" onclick="saveTravel()">Save</button>
+  </div>
+</div>
+</div>
+
+<script>
+// ── Supabase ──────────────────────────────────────────────
+const SB_URL='https://xrhmqumgskdmwklihhva.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhyaG1xdW1nc2tkbXdrbGloaHZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNzYzODEsImV4cCI6MjA4ODk1MjM4MX0.Ozndx_hEm_x1xN18a6CPkArEWHCgVGZQpcaClto9FDk';
+const sb=supabase.createClient(SB_URL,SB_KEY,{
+  auth:{autoRefreshToken:true,persistSession:true,detectSessionInUrl:true}
+});
+let currentUser=null;
+
+// ── Constants ─────────────────────────────────────────────
+const MONTHS=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+const PALETTE=[
+  '#4472C4','#ED7D31','#A9D18E','#FF0000','#FFC000','#5B9BD5','#70AD47','#7030A0',
+  '#C00000','#00B0F0','#92D050','#FF7C80','#FFD966','#9DC3E6','#FF9999',
+  '#F2F2F2','#E6E6E6','#D9D9D9','#BFBFBF','#A6A6A6','#808080','#595959','#404040','#262626'
+];
+const BG_MAP={'#4472C4':'#EEF3FB','#ED7D31':'#FEF0E7','#A9D18E':'#F2FAF0','#FF0000':'#FFF0F0','#FFC000':'#FFFBE6','#5B9BD5':'#EBF4FB','#70AD47':'#F0F7EB','#7030A0':'#F5EEF8','#C00000':'#FAEAEA','#00B0F0':'#E6F7FF','#92D050':'#F4FBEA','#FF7C80':'#FFF0F0','#FFD966':'#FFFBE6','#9DC3E6':'#EEF6FB','#FF9999':'#FFF0F0','#F2F2F2':'#FAFAFA','#E6E6E6':'#F5F5F5','#D9D9D9':'#F0F0F0','#BFBFBF':'#EBEBEB','#A6A6A6':'#E8E8E8','#808080':'#E0E0E0','#595959':'#D8D8D8','#404040':'#D0D0D0','#262626':'#C8C8C8'};
+const TXT_MAP={'#4472C4':'#1F3864','#ED7D31':'#843C0C','#A9D18E':'#375623','#FF0000':'#C00000','#FFC000':'#7F6000','#5B9BD5':'#1F497D','#70AD47':'#375623','#7030A0':'#3D1B52','#C00000':'#7B0000','#00B0F0':'#006699','#92D050':'#3D6B00','#FF7C80':'#C00000','#FFD966':'#7F6000','#9DC3E6':'#1F497D','#FF9999':'#C00000','#F2F2F2':'#404040','#E6E6E6':'#404040','#D9D9D9':'#404040','#BFBFBF':'#262626','#A6A6A6':'#262626','#808080':'#F2F2F2','#595959':'#F2F2F2','#404040':'#F2F2F2','#262626':'#F2F2F2'};
+function evBg(c){return BG_MAP[c]||(c+'22');}
+function evTxt(c){return TXT_MAP[c]||c;}
+
+const HOLIDAYS={'2025-01-01':'신정','2025-01-28':'설날연휴','2025-01-29':'설날','2025-01-30':'설날연휴','2025-03-01':'삼일절','2025-03-03':'삼일절대체','2025-05-05':'어린이날','2025-05-06':'어린이날대체','2025-05-15':'부처님오신날','2025-06-06':'현충일','2025-08-15':'광복절','2025-10-03':'개천절','2025-10-05':'추석연휴','2025-10-06':'추석','2025-10-07':'추석연휴','2025-10-08':'추석대체','2025-10-09':'한글날','2025-12-25':'크리스마스','2026-01-01':'신정','2026-02-17':'설날연휴','2026-02-18':'설날','2026-02-19':'설날연휴','2026-03-01':'삼일절','2026-03-02':'삼일절대체','2026-05-05':'어린이날','2026-05-24':'부처님오신날','2026-05-25':'부처님오신날대체','2026-06-06':'현충일','2026-08-15':'광복절','2026-08-17':'광복절대체','2026-09-24':'추석연휴','2026-09-25':'추석','2026-09-26':'추석연휴','2026-10-03':'개천절','2026-10-05':'개천절대체','2026-10-09':'한글날','2026-12-25':'크리스마스'};
+function holName(ds){return HOLIDAYS[ds]||'';}
+function isHol(ds){return !!HOLIDAYS[ds];}
+
+// ── Data ──────────────────────────────────────────────────
+let data={
+  projects:[],timedEvents:[],timedCats:[],
+  projEvents:[],tasks:[],
+  golf:{},office:{},cellColors:{},cellEmojis:{},
+  anniversaries:[],periodLogs:[],travels:[],
+  homeNote:'',classMemos:{},haegobjMemos:{},
+  projOrder:[]
+};
+
+// ── State ─────────────────────────────────────────────────
+const today=new Date();
+const fmtDate=d=>{const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');return`${y}-${m}-${dd}`;};
+const todayStr=()=>fmtDate(today);
+const parseDate=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);};
+const ym=(y,mo,d)=>`${y}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+const timeDiff=(a,b)=>{if(!a||!b)return 0;const[ah,am]=a.split(':').map(Number),[bh,bm]=b.split(':').map(Number);return(bh*60+bm)-(ah*60+am);};
+const makeId=()=>{
+  try{return crypto.randomUUID();}
+  catch(e){
+    // fallback: RFC4122 compliant UUID
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);return v.toString(16);});
+  }
+};
+const escH=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+let state={view:'home',cursor:new Date(today),selected:todayStr(),projFilter:null,timedFilter:null,filterMode:null,todoPanelDate:todayStr()};
+
+// ── Helpers ───────────────────────────────────────────────
+function proj(id){return data.projects.find(p=>p.id===id)||{name:'',color:'#999'};}
+function timedCat(id){return data.timedCats.find(c=>c.id===id)||{name:'',color:'#4472C4',emoji:''};}
+function timedEventsOn(ds){
+  let tes=data.timedEvents.filter(t=>t.date===ds);
+  if(state.timedFilter)tes=tes.filter(t=>t.categoryId===state.timedFilter);
+  return tes.sort((a,b)=>a.time.localeCompare(b.time));
+}
+function projEventsOn(ds){
+  let evs=data.projEvents.filter(e=>e.date===ds);
+  if(state.projFilter)evs=evs.filter(e=>e.projectId===state.projFilter);
+  return evs;
+}
+function tasksOn(ds,noSub){
+  let tds=data.tasks.filter(t=>t.date===ds);
+  if(noSub)tds=tds.filter(t=>!t.eventId); // 세부항목 제외
+  if(state.projFilter)tds=tds.filter(t=>t.projectId===state.projFilter);
+  return tds;
+}
+function getAnnivs(ds){
+  const d=parseDate(ds),m=d.getMonth()+1,day=d.getDate(),yr=d.getFullYear();
+  return data.anniversaries.filter(a=>a.repeatYearly?a.month===m&&a.day===day:a.month===m&&a.day===day&&(!a.year||a.year===yr));
+}
+function orderedProjects(){
+  if(data.projOrder.length>0){
+    const ordered=[];
+    data.projOrder.forEach(id=>{const p=data.projects.find(x=>x.id===id);if(p)ordered.push(p);});
+    data.projects.forEach(p=>{if(!data.projOrder.includes(p.id))ordered.push(p);});
+    return ordered;
+  }
+  return data.projects;
+}
+
+// ── Theme ─────────────────────────────────────────────────
+function toggleTheme(){
+  const dark=document.documentElement.getAttribute('data-theme')==='dark';
+  document.documentElement.setAttribute('data-theme',dark?'light':'dark');
+  document.getElementById('theme-btn').textContent=dark?'🌙':'☀️';
+  localStorage.setItem('theme',dark?'light':'dark');
+}
+function initTheme(){
+  const s=localStorage.getItem('theme')||'light';
+  document.documentElement.setAttribute('data-theme',s);
+  document.getElementById('theme-btn').textContent=s==='dark'?'☀️':'🌙';
+}
+
+// ── Sync ──────────────────────────────────────────────────
+let _syncTimer=null;
+function setSyncing(){
+  document.getElementById('sync-dot').className='sync-dot syncing';
+  document.getElementById('sync-txt').textContent='Syncing...';
+}
+function setSynced(){document.getElementById('sync-dot').className='sync-dot';document.getElementById('sync-txt').textContent='Synced';}
+function setSyncErr(m){document.getElementById('sync-dot').className='sync-dot error';document.getElementById('sync-txt').textContent=m||'Error';}
+
+// ── Auth ──────────────────────────────────────────────────
+async function signIn(){
+  document.getElementById('login-loading').textContent='Signing in...';
+  await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:'https://jinhae-schedule.github.io/schedule/'}});
+}
+async function signOut(){await sb.auth.signOut();location.reload();}
+function showLogin(){document.getElementById('login-screen').style.display='flex';document.getElementById('app').style.display='none';document.getElementById('sync-status').style.display='none';}
+async function showApp(user){
+  currentUser=user;
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  document.getElementById('sync-status').style.display='flex';
+  const name=user.user_metadata?.full_name||user.email||'User';
+  document.getElementById('user-name').textContent=name;
+  document.getElementById('user-avatar').textContent=name[0].toUpperCase();
+  initTheme();
+  setupHistory();
+  await loadAll();
+}
+
+// ── Load All ──────────────────────────────────────────────
+async function loadAll(){
+  setSyncing();
+  document.getElementById('main-content').innerHTML='<div class="empty">동기화 중...</div>';
+  try{
+    const uid=currentUser.id;
+    const[teRes,tcRes,peRes,tdRes,prRes,gRes,oRes,ccRes,anRes,plRes,hnRes,cmRes,trRes]=await Promise.all([
+      sb.from('timed_events').select('*').eq('user_id',uid),
+      sb.from('timed_categories').select('*').eq('user_id',uid),
+      sb.from('events').select('*').eq('user_id',uid),
+      sb.from('todos').select('*').eq('user_id',uid),
+      sb.from('projects').select('*').eq('user_id',uid),
+      sb.from('golf').select('*').eq('user_id',uid),
+      sb.from('office').select('*').eq('user_id',uid),
+      sb.from('cell_colors').select('*').eq('user_id',uid),
+      sb.from('anniversaries').select('*').eq('user_id',uid),
+      sb.from('period_logs').select('*').eq('user_id',uid),
+      sb.from('home_notes').select('*').eq('user_id',uid).maybeSingle(),
+      sb.from('class_memos').select('*').eq('user_id',uid),
+      sb.from('travels').select('*').eq('user_id',uid),
+    ]);
+
+    data.timedCats=(tcRes.data||[]).map(c=>({id:c.id,name:c.name,color:c.color||'#4472C4',emoji:c.emoji||''}));
+    data.timedEvents=(teRes.data||[]).map(t=>({id:t.id,title:t.title,date:t.date,time:t.time,categoryId:t.category_id||''}));
+    data.projEvents=(peRes.data||[]).map(e=>({id:e.id,title:e.title,date:e.date,start:e.start||'',projectId:e.project_id||'',color:e.color||'',note:e.note||''}));
+    data.tasks=(tdRes.data||[]).map(t=>({id:t.id,title:t.title,date:t.date||'',projectId:t.project_id||'',done:t.done||false,eventId:t.event_id||''}));
+
+    // Projects - default 5 if empty
+    if((prRes.data||[]).length===0){
+      const defs=[{id:makeId(),name:'개인',color:'#2D6BE4'},{id:makeId(),name:'수업 · 과제',color:'#1D9E75'},{id:makeId(),name:'박사 논문',color:'#6C4FBF'},{id:makeId(),name:'HAEGOBJ',color:'#D4537E'},{id:makeId(),name:'기타',color:'#7C6F5B'}];
+      data.projects=defs;
+      await sb.from('projects').insert(defs.map(p=>({id:p.id,user_id:uid,name:p.name,color:p.color})));
+    } else {
+      data.projects=(prRes.data||[]).map(p=>({id:p.id,name:p.name,color:p.color||'#4472C4'}));
+    }
+
+    data.golf={};(gRes.data||[]).forEach(g=>{data.golf[g.date]={rounds:g.rounds||[],weather:g.weather||''};});
+    data.office={};(oRes.data||[]).forEach(o=>{data.office[o.date]={in:o.time_in||'',out:o.time_out||''};});
+    data.cellColors={};data.cellEmojis={};
+    (ccRes.data||[]).forEach(c=>{
+      if(c.date&&c.date.startsWith('emoji_')){data.cellEmojis[c.date.slice(6)]=c.color;}
+      else{data.cellColors[c.date]=c.color;}
+    });
+    data.anniversaries=(anRes.data||[]).map(a=>({id:a.id,name:a.name,emoji:a.emoji||'🎉',month:a.month,day:a.day,year:a.year||null,repeatYearly:a.repeat_yearly}));
+    data.periodLogs=(plRes.data||[]).map(p=>({id:p.id,startDate:p.start_date})).sort((a,b)=>b.startDate.localeCompare(a.startDate));
+    data.travels=(trRes.data||[]).map(t=>({id:t.id,name:t.name,destination:t.destination||'',startDate:t.start_date,endDate:t.end_date,color:t.color||'#4472C4',memo:t.memo||''})).sort((a,b)=>a.startDate.localeCompare(b.startDate));
+    data.homeNote=hnRes.data?.note1||'';
+    data.classMemos={};data.haegobjMemos={};
+    (cmRes.data||[]).forEach(m=>{
+      if(!m.project_id)return;
+      if(m.project_id.startsWith('haegobj_')){
+        data.haegobjMemos[m.project_id.replace('haegobj_','')]=m.content||'';
+      } else if(m.project_id.startsWith('travel_')){
+        data.classMemos[m.project_id]=m.content||'';
+      } else if(m.project_id.startsWith('te_')&&m.week===0){
+        // timed event memo
+        data.classMemos[`te_memo_${m.project_id.slice(3)}`]=m.content||'';
+      } else if(m.week===0){
+        // proj event memo
+        data.classMemos[`ev_memo_${m.project_id}`]=m.content||'';
+      } else {
+        data.classMemos[`${m.project_id}_${m.week}`]=m.content||'';
+      }
+    });
+
+    setSynced();renderAll();
+  }catch(e){console.error(e);setSyncErr('Load Error');}
+}
+
+// ── Save functions ────────────────────────────────────────
+async function saveTimedEvent(te){
+  setSyncing();
+  const{error}=await sb.from('timed_events').upsert({id:te.id,user_id:currentUser.id,title:te.title,date:te.date,time:te.time,category_id:te.categoryId||null});
+  if(error){setSyncErr('Save Error');return error.message;}setSynced();return null;
+}
+async function delTimedEvent(id,backup){
+  setSyncing();
+  const{error}=await sb.from('timed_events').delete().eq('id',id).eq('user_id',currentUser.id);
+  if(error){if(backup)data.timedEvents.push(backup);renderAll();setSyncErr('Delete Error');alert('Delete failed');}
+  else setSynced();
+}
+async function saveProjEvent(ev){
+  setSyncing();
+  const{error}=await sb.from('events').upsert({id:ev.id,user_id:currentUser.id,title:ev.title,date:ev.date,start:ev.start||null,end:null,project_id:ev.projectId||null,color:ev.color||null,note:ev.note||null});
+  if(error){setSyncErr('Save Error');return error.message;}setSynced();return null;
+}
+async function delProjEvent(id,backup,subBackup){
+  setSyncing();
+  const{error}=await sb.from('events').delete().eq('id',id).eq('user_id',currentUser.id);
+  if(error){
+    if(backup)data.projEvents.push(backup);
+    if(subBackup&&subBackup.length)data.tasks.push(...subBackup);
+    renderAll();setSyncErr('Delete Error');alert('Delete failed');
+  } else {
+    // 이벤트 삭제 성공 시 연결된 tasks도 DB에서 삭제
+    if(subBackup&&subBackup.length){
+      await sb.from('todos').delete().in('id',subBackup.map(t=>t.id)).eq('user_id',currentUser.id);
+    }
+    setSynced();
+  }
+}
+async function saveTask(td){
+  setSyncing();
+  const{error}=await sb.from('todos').upsert({id:td.id,user_id:currentUser.id,title:td.title,date:td.date||null,project_id:td.projectId||null,done:td.done,event_id:td.eventId||null});
+  if(error){setSyncErr('Save Error');return error.message;}setSynced();return null;
+}
+async function delTask(id){setSyncing();await sb.from('todos').delete().eq('id',id).eq('user_id',currentUser.id);setSynced();}
+async function saveProj(p){setSyncing();const{error}=await sb.from('projects').upsert({id:p.id,user_id:currentUser.id,name:p.name,color:p.color});if(error)setSyncErr('Save Error');else setSynced();}
+async function delProj(id){setSyncing();await sb.from('projects').delete().eq('id',id).eq('user_id',currentUser.id);setSynced();}
+async function saveGolfRec(ds,rec){
+  setSyncing();
+  const{error}=rec?await sb.from('golf').upsert({user_id:currentUser.id,date:ds,rounds:rec.rounds||[],weather:rec.weather||''},{onConflict:'user_id,date'}):await sb.from('golf').delete().eq('date',ds).eq('user_id',currentUser.id);
+  if(error)setSyncErr('Save Error');else setSynced();
+}
+async function saveOfficeRec(ds,rec){
+  setSyncing();
+  const{error}=rec&&(rec.in||rec.out)?await sb.from('office').upsert({user_id:currentUser.id,date:ds,time_in:rec.in||'',time_out:rec.out||''},{onConflict:'user_id,date'}):await sb.from('office').delete().eq('date',ds).eq('user_id',currentUser.id);
+  if(error)setSyncErr('Save Error');else setSynced();
+}
+async function saveCellColor(ds,color){
+  setSyncing();
+  const{error}=color?await sb.from('cell_colors').upsert({user_id:currentUser.id,date:ds,color}):await sb.from('cell_colors').delete().eq('date',ds).eq('user_id',currentUser.id);
+  if(error)setSyncErr('Save Error');else setSynced();
+}
+async function saveHomeNote(val){
+  setSyncing();
+  const{error}=await sb.from('home_notes').upsert({user_id:currentUser.id,note1:val},{onConflict:'user_id'});
+  if(error)setSyncErr('Save Error');else setSynced();
+}
+async function saveEvMemo(id,val){
+  // id가 'te_xxx' 이면 timed event memo, 아니면 proj event memo
+  const isTe=id.startsWith('te_');
+  const realId=isTe?id.slice(3):id;
+  const key=isTe?`te_memo_${realId}`:`ev_memo_${realId}`;
+  data.classMemos[key]=val;
+  // DB: project_id = realId, week = 0 (te는 te_ prefix 붙여서 구분)
+  const pid=isTe?`te_${realId}`:realId;
+  setSyncing();
+  const{error}=await sb.from('class_memos').upsert(
+    {user_id:currentUser.id,project_id:pid,week:0,content:val},
+    {onConflict:'user_id,project_id,week'}
+  );
+  if(error)setSyncErr('Save Error');else setSynced();
+}
+async function saveClassMemo(pid,week,content){
+  setSyncing();
+  const{error}=await sb.from('class_memos').upsert({user_id:currentUser.id,project_id:pid,week,content},{onConflict:'user_id,project_id,week'});
+  if(error)setSyncErr('Save Error');else setSynced();
+}
+async function savePeriodLog(log){setSyncing();const{error}=await sb.from('period_logs').insert({id:log.id,user_id:currentUser.id,start_date:log.startDate});if(error)setSyncErr('Save Error');else setSynced();}
+async function delPeriodLog(id){setSyncing();await sb.from('period_logs').delete().eq('id',id).eq('user_id',currentUser.id);setSynced();}
+// ── Navigation ────────────────────────────────────────────
+function setView(v){
+  state.view=v;
+  if(v==='month'){state.projFilter=null;state.timedFilter=null;state.filterMode=null;}
+  if(v==='todos'){state.cursor=new Date(today);}
+  if(window.innerWidth<=768)closeSb();
+  document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
+  renderAll();
+}
+function navigate(dir){
+  const c=state.cursor;
+  if(['day','todos'].includes(state.view))c.setDate(c.getDate()+dir);
+  else if(state.view==='haegobj')c.setDate(c.getDate()+dir*7);
+  else if(['month','studio','golf','period','filtered','travel','tasks'].includes(state.view))c.setMonth(c.getMonth()+dir);
+  else if(['year'].includes(state.view))c.setFullYear(c.getFullYear()+dir);
+  state.cursor=new Date(c);renderAll();
+}
+function goToday(){state.cursor=new Date(today);state.selected=todayStr();renderAll();}
+function selectDay(ds){state.selected=ds;state.cursor=parseDate(ds);renderAll();}
+function jumpToDay(ds){state.selected=ds;state.cursor=parseDate(ds);setView('day');}
+function setProjFilter(pid){
+  state.projFilter=pid;
+  state.timedFilter=null;
+  state.filterMode='proj';
+  state.view='filtered';
+  document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.remove('active'));
+  if(window.innerWidth<=768)closeSb();
+  renderAll();
+}
+function setTimedFilter(id){
+  state.timedFilter=id;
+  state.projFilter=null;
+  state.filterMode='timed';
+  state.view='filtered';
+  document.querySelectorAll('.nav-btn[data-view]').forEach(b=>b.classList.remove('active'));
+  if(window.innerWidth<=768)closeSb();
+  renderAll();
+}
+
+// ── Sidebar ───────────────────────────────────────────────
+function toggleSb(){
+  const sb=document.getElementById('sidebar');
+  const opening=!sb.classList.contains('open');
+  sb.classList.toggle('open');
+  document.getElementById('sb-overlay').classList.toggle('open');
+  if(opening&&window.innerWidth<=768)pushUiState('sidebar');
+}
+function closeSb(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sb-overlay').classList.remove('open');}
+
+// ── Render All ────────────────────────────────────────────
+function renderAll(){
+  if(!currentUser)return;
+  updateTitle();renderSidebar();renderFilterBar();
+  const views={home:renderHome,year:renderYear,month:renderMonth,filtered:renderFiltered,tasks:renderTaskCal,todos:renderTodos,day:renderDay,haegobj:renderHaegobj,golf:renderGolf,studio:renderStudio,period:renderPeriod,travel:renderTravel};
+  (views[state.view]||renderHome)();
+}
+function updateTitle(){
+  const c=state.cursor;
+  const titles={home:'🏠 Home',year:c.getFullYear()+'년',filtered:'',haegobj:'👗 HAEGOBJ',todos:'✓ Todo List',tasks:'📋 Tasks — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',travel:'✈️ Travel — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',month:c.getFullYear()+'년 '+(c.getMonth()+1)+'월',day:c.getFullYear()+'년 '+(c.getMonth()+1)+'월 '+c.getDate()+'일 ('+['일','월','화','수','목','금','토'][c.getDay()]+')',golf:'⛳ Golf',studio:'🏢 Studio',period:'🌸 Period — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월'};
+  document.getElementById('main-title').textContent=titles[state.view]||'';
+}
+function renderSidebar(){
+  // Projects
+  const projs=orderedProjects();
+  const totalEv=data.projEvents.length;
+  document.getElementById('proj-all-cnt').textContent=totalEv;
+  document.getElementById('proj-all-btn').className='proj-btn'+(state.projFilter===null?' active':'');
+  let ph='';
+  projs.forEach(p=>{
+    const cnt=data.projEvents.filter(e=>e.projectId===p.id).length;
+    ph+=`<div style="display:flex;align-items:center">
+      <button class="proj-btn${state.projFilter===p.id?' active':''}" onclick="setProjFilter('${p.id}')" style="flex:1">
+        <span class="proj-dot" style="background:${p.color}"></span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(p.name)}</span>
+        <span class="proj-cnt">${cnt}</span>
+      </button>
+    </div>`;
+  });
+  document.getElementById('proj-nav-list').innerHTML=ph;
+
+  // Timed cats
+  document.getElementById('te-all-cnt').textContent=data.timedEvents.length;
+  document.getElementById('te-all-btn').className='proj-btn'+(state.timedFilter===null?' active':'');
+  let th='';
+  data.timedCats.forEach(c=>{
+    const cnt=data.timedEvents.filter(t=>t.categoryId===c.id).length;
+    th+=`<button class="proj-btn${state.timedFilter===c.id?' active':''}" onclick="setTimedFilter('${c.id}')">
+      <span class="proj-dot" style="background:${c.color}"></span>
+      <span>${c.emoji?c.emoji+' ':''}${escH(c.name)}</span>
+      <span class="proj-cnt">${cnt}</span>
+    </button>`;
+  });
+  document.getElementById('te-cat-list').innerHTML=th;
+}
+function renderFilterBar(){
+  // filter-bar는 month 뷰 내부 네비에 통합됨
+  document.getElementById('filter-bar').style.display='none';
+}
+
+// ── Home ──────────────────────────────────────────────────
+function renderHome(){
+  const ds=todayStr();
+  const tes=timedEventsOn(ds),pevs=projEventsOn(ds),tds=data.tasks.filter(t=>!t.done&&!t.eventId);
+  const d=new Date();
+  const days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  let html=`<div style="display:grid;grid-template-columns:1fr 300px;gap:14px;align-items:start" class="home-grid">`;
+  html+=`<div style="display:flex;flex-direction:column;gap:12px">`;
+  // Header
+  html+=`<div class="card" style="padding:16px 18px;display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <div style="font-size:17px;font-weight:600;font-family:var(--font-ui)">${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 ${days[d.getDay()]}</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:3px">Events ${tes.length+pevs.length} · Tasks ${tds.length}</div>
+    </div>
+    <button onclick="setView('month')" class="btn-save" style="border-radius:20px;font-size:12px;padding:6px 14px">Calendar →</button>
+  </div>`;
+  // Today schedule
+  if(tes.length+pevs.length>0){
+    html+=`<div class="card" style="overflow:hidden">
+      <div style="padding:9px 14px;font-size:11px;font-weight:600;color:var(--text3);border-bottom:1px solid var(--border);letter-spacing:.5px;text-transform:uppercase">Today</div>`;
+    tes.forEach(te=>{const cat=timedCat(te.categoryId),c=cat.color||'#4472C4';html+=`<div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid var(--border);cursor:pointer" onclick="openEditItem('timed','${te.id}')"><span style="font-size:11px;font-weight:600;color:${c};width:36px;flex-shrink:0">${te.time}</span><span style="font-size:13px">${cat.emoji?cat.emoji+' ':''}${escH(te.title)}</span></div>`;});
+    pevs.forEach(ev=>{const p=proj(ev.projectId),c=p.color||'#4472C4';html+=`<div style="display:flex;align-items:center;gap:10px;padding:7px 14px;border-bottom:1px solid var(--border);cursor:pointer" onclick="openEditItem('proj','${ev.id}')"><span style="font-size:11px;font-weight:600;color:${c};width:36px;flex-shrink:0">${ev.start||'--:--'}</span><span style="font-size:13px">${escH(ev.title)}</span></div>`;});
+    html+=`</div>`;
+  }
+  // Memo
+  html+=`<div class="card" style="overflow:hidden">
+    <div style="padding:9px 14px;font-size:11px;font-weight:600;color:var(--text3);border-bottom:1px solid var(--border);letter-spacing:.5px;text-transform:uppercase">Memo</div>
+    <textarea id="home-memo" style="width:100%;min-height:200px;padding:12px 14px;border:none;background:transparent;font-size:13px;font-family:var(--font);color:var(--text);resize:vertical;outline:none;box-sizing:border-box;line-height:1.7" placeholder="Free notes..." oninput="homeNoteChange(this.value)">${escH(data.homeNote)}</textarea>
+  </div>`;
+  html+=`</div>`;
+  // Right: todos
+  html+=`<div class="card" style="overflow:hidden;position:sticky;top:14px">
+    <div style="padding:9px 14px;font-size:11px;font-weight:600;color:var(--text3);border-bottom:1px solid var(--border);letter-spacing:.5px;text-transform:uppercase;display:flex;align-items:center;justify-content:space-between">Todo List<span style="background:var(--accent);color:#fff;font-size:10px;padding:1px 7px;border-radius:8px">${tds.length}</span></div>
+    <div style="max-height:calc(100vh - 200px);overflow-y:auto">`;
+  if(tds.length===0)html+=`<div class="empty">All done! 🎉</div>`;
+  else tds.forEach(td=>{
+    const p=proj(td.projectId);
+    html+=`<div class="todo-item"><input type="checkbox" class="todo-cb" onchange="toggleTask('${td.id}',this.checked)"><div style="flex:1;min-width:0"><div class="todo-txt">${escH(td.title)}</div>${p.name?`<div style="font-size:10px;color:${p.color}">${p.name}</div>`:''}</div><button class="todo-del" onclick="deleteTask('${td.id}')">✕</button></div>`;
+  });
+  html+=`</div>
+    <div class="quick-add">
+      <input type="text" id="home-todo-inp" placeholder="Add task..." onkeydown="if(event.key==='Enter')addHomeTask()">
+      <button onclick="addHomeTask()">+</button>
+    </div>
+  </div>`;
+  html+=`</div>`;
+  document.getElementById('main-content').innerHTML=html;
+}
+let _homeNoteTimer=null;
+function homeNoteChange(v){data.homeNote=v;clearTimeout(_homeNoteTimer);_homeNoteTimer=setTimeout(()=>saveHomeNote(v),1500);}
+async function addHomeTask(){
+  const inp=document.getElementById('home-todo-inp');
+  const title=inp.value.trim();if(!title)return;
+  const td={id:makeId(),title,date:todayStr(),projectId:'',done:false,eventId:''};
+  data.tasks.push(td);inp.value='';renderAll();
+  const err=await saveTask(td);if(err){data.tasks=data.tasks.filter(t=>t.id!==td.id);renderAll();}
+}
+
+// ── Month ─────────────────────────────────────────────────
+function renderMonth(){
+  const todS=todayStr();
+  const yr=state.cursor.getFullYear(),mo=state.cursor.getMonth();
+  // 뷰 내 네비게이션 헤더
+  let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월~</span>
+
+  </div>`;
+
+  // 현재 달 기준 앞뒤로 보여줄 달 범위: 현재달 + 이후 2달 (총 3달 연속)
+  const months=[];
+  for(let i=0;i<12;i++){
+    const d=new Date(yr,mo+i,1);
+    months.push({year:d.getFullYear(),month:d.getMonth()});
+  }
+
+
+  months.forEach(({year:myr,month:mmo})=>{
+    const first=new Date(myr,mmo,1),last=new Date(myr,mmo+1,0);
+    const offset=(first.getDay()||7)-1;
+
+    html+=`<div style="margin-bottom:2px">`;
+    // 월 헤더
+    html+=`<div style="padding:10px 14px 6px;font-size:14px;font-weight:600;font-family:var(--font-ui);display:flex;align-items:center;gap:8px">
+      ${myr}년 ${mmo+1}월
+      ${myr===yr&&mmo===mo?`<span style="font-size:10px;background:var(--accent);color:#fff;padding:1px 7px;border-radius:8px">현재</span>`:''}
+    </div>`;
+
+    html+=`<div class="card month-view"><div class="month-hdr">`;
+    ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach((d,i)=>html+=`<div class="month-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`);
+    html+=`</div><div class="month-grid">`;
+
+    let cells=[];
+    for(let i=0;i<offset;i++){let d=new Date(myr,mmo,1-offset+i);cells.push({date:d,other:true});}
+    for(let i=1;i<=last.getDate();i++)cells.push({date:new Date(myr,mmo,i),other:false});
+    const rem=7-(cells.length%7);if(rem<7)for(let i=1;i<=rem;i++)cells.push({date:new Date(myr,mmo+1,i),other:true});
+
+    cells.forEach(cell=>{
+      const ds=fmtDate(cell.date),isT=ds===todS,isSel=ds===state.selected;
+      const dow=cell.date.getDay(),di=dow===0?6:dow-1;
+      const hol=!cell.other?holName(ds):'';
+      const annivs=!cell.other?getAnnivs(ds):[];
+      const numColor=hol?'color:var(--red)':di===5?'color:var(--accent)':di===6?'color:var(--red)':'';
+      const cellBg=!cell.other&&data.cellColors[ds]?data.cellColors[ds]:'';
+      html+=`<div class="month-cell${cell.other?' other':''}${isT?' today':''}${isSel?' selected':''}" style="${cellBg?`background:${cellBg}1A;`:''}"
+        onclick="selectDay('${ds}');${!cell.other?`openAddModal('${ds}')`:''}"
+        oncontextmenu="event.preventDefault();${!cell.other?`openCellColorPicker('${ds}',event)`:''}">`;
+      let lbls='';
+      if(!cell.other){
+        if(hol)lbls+=`<span style="font-size:9px;color:var(--red);font-weight:500;margin-left:3px">${hol}</span>`;
+        annivs.forEach(a=>lbls+=`<span style="font-size:9px;color:var(--accent);font-weight:500;margin-left:3px">${a.emoji||''}${a.name}</span>`);
+      }
+      const cellEmoji=!cell.other?(data.cellEmojis[ds]||''):'';
+      html+=`<div class="month-cell-num" style="${numColor}${cellBg&&!cell.other?`color:${cellBg};font-weight:700;`:''}">
+        <span>${cell.date.getDate()}</span>${cellBg&&!cell.other?`<span class="cell-dot" style="background:${cellBg}"></span>`:''}${lbls}
+      </div>
+      ${cellEmoji?`<div style="font-size:20px;text-align:center;line-height:1;margin:2px 0;cursor:pointer" onclick="event.stopPropagation();openCellColorPicker('${ds}',event)">${cellEmoji}</div>`:''}`;
+      // 전체 표시 (Timed + Project + Task + Travel)
+      data.timedEvents.filter(t=>t.date===ds).sort((a,b)=>a.time.localeCompare(b.time)).forEach(te=>{const cat=timedCat(te.categoryId),c=cat.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)};display:flex;gap:2px" onclick="event.stopPropagation();openEditItem('timed','${te.id}')"><span style="opacity:.75;font-size:9px;flex-shrink:0">${te.time}</span><span style="overflow:hidden;text-overflow:ellipsis">${escH(te.title)}</span></div>`;});
+      data.projEvents.filter(e=>e.date===ds).forEach(ev=>{const p=proj(ev.projectId),c=p.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}" onclick="event.stopPropagation();openEditItem('proj','${ev.id}')">${escH(ev.title)}</div>`;});
+      data.tasks.filter(t=>t.date===ds&&!t.eventId).forEach(td=>{const p=proj(td.projectId),c=p.color||'#999';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}">${td.done?'✓ ':''}${escH(td.title)}</div>`;});
+      data.travels.filter(t=>t.startDate<=ds&&t.endDate>=ds).forEach(t=>{html+=`<div class="month-ev" style="background:${evBg(t.color)};color:${evTxt(t.color)}" onclick="event.stopPropagation();setView('travel')">✈️ ${escH(t.name)}</div>`;});
+      html+=`</div>`;
+    });
+    html+=`</div></div></div>`;
+  });
+
+    document.getElementById('main-content').innerHTML=html;
+}
+
+// ── Filtered View ────────────────────────────────────────
+function renderFiltered(){
+  const yr=state.cursor.getFullYear(),mo=state.cursor.getMonth();
+  const todS=todayStr();
+  const mode=state.filterMode; // 'proj' or 'timed'
+  const hasProjFilter=state.projFilter;
+  const hasTimedFilter=state.timedFilter;
+
+  // 헤더 정보
+  let label='',color='#4472C4',emoji='';
+  if(hasProjFilter){const p=proj(hasProjFilter);label=p.name;color=p.color;}
+  else if(hasTimedFilter){const c=timedCat(hasTimedFilter);label=c.name;color=c.color;emoji=c.emoji||'';}
+  else if(mode==='proj'){label='Projects All';color='var(--text2)';}
+  else if(mode==='timed'){label='Timed Events All';color='var(--text2)';}
+
+  // 이 필터에 해당하는 이벤트들
+  let filteredTimedEvs=[], filteredProjEvs=[];
+  if(mode==='timed'||hasTimedFilter){
+    filteredTimedEvs=hasTimedFilter
+      ?data.timedEvents.filter(t=>t.categoryId===hasTimedFilter)
+      :data.timedEvents;
+  }
+  if(mode==='proj'||hasProjFilter){
+    filteredProjEvs=hasProjFilter
+      ?data.projEvents.filter(e=>e.projectId===hasProjFilter)
+      :data.projEvents;
+  }
+
+  // 이달 이벤트
+  const moStr=`${yr}-${String(mo+1).padStart(2,'0')}`;
+  const monthTimedEvs=filteredTimedEvs.filter(t=>t.date.startsWith(moStr));
+  const monthProjEvs=filteredProjEvs.filter(e=>e.date.startsWith(moStr));
+
+  let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월</span>
+    <span style="font-size:12px;font-weight:500;padding:3px 10px;border-radius:12px;background:${color==='var(--text2)'?'var(--surface2)':evBg(color)};color:${color==='var(--text2)'?'var(--text2)':evTxt(color)}">${emoji?emoji+' ':''}${escH(label)}</span>
+    <button onclick="setView('month')" class="btn-cancel" style="font-size:11px;padding:2px 8px;border-radius:12px;margin-left:auto">✕ 전체보기</button>
+  </div>`;
+
+  // 단일 달력
+  const first=new Date(yr,mo,1),last=new Date(yr,mo+1,0);
+  const offset=(first.getDay()||7)-1;
+  html+=`<div class="card month-view" style="margin-bottom:14px"><div class="month-hdr">`;
+  ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach((d,i)=>html+=`<div class="month-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`);
+  html+=`</div><div class="month-grid">`;
+
+  let cells=[];
+  for(let i=0;i<offset;i++){let d=new Date(yr,mo,1-offset+i);cells.push({date:d,other:true});}
+  for(let i=1;i<=last.getDate();i++)cells.push({date:new Date(yr,mo,i),other:false});
+  const rem=7-(cells.length%7);if(rem<7)for(let i=1;i<=rem;i++)cells.push({date:new Date(yr,mo+1,i),other:true});
+
+  cells.forEach(cell=>{
+    const ds=fmtDate(cell.date),isT=ds===todS;
+    const dow=cell.date.getDay(),di=dow===0?6:dow-1;
+    const hol=!cell.other?holName(ds):'';
+    const annivs=!cell.other?getAnnivs(ds):[];
+    const numColor=hol?'color:var(--red)':di===5?'color:var(--accent)':di===6?'color:var(--red)':'';
+    html+=`<div class="month-cell${cell.other?' other':''}${isT?' today':''}"
+      onclick="${!cell.other?`openAddModal('${ds}')`:''}"
+      oncontextmenu="event.preventDefault();${!cell.other?`openCellColorPicker('${ds}',event)`:''}">`;
+    let lbls='';
+    if(!cell.other){
+      if(hol)lbls+=`<span style="font-size:9px;color:var(--red);font-weight:500;margin-left:3px">${hol}</span>`;
+      annivs.forEach(a=>lbls+=`<span style="font-size:9px;color:var(--accent);font-weight:500;margin-left:3px">${a.emoji||''}${a.name}</span>`);
+    }
+    html+=`<div class="month-cell-num" style="${numColor}"><span>${cell.date.getDate()}</span>${lbls}</div>`;
+    filteredTimedEvs.filter(t=>t.date===ds).sort((a,b)=>a.time.localeCompare(b.time)).forEach(te=>{
+      const cat=timedCat(te.categoryId),c=cat.color||'#4472C4';
+      html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)};display:flex;gap:2px" onclick="event.stopPropagation();openEditItem('timed','${te.id}')"><span style="opacity:.75;font-size:9px;flex-shrink:0">${te.time}</span><span style="overflow:hidden;text-overflow:ellipsis">${escH(te.title)}</span></div>`;
+    });
+    filteredProjEvs.filter(e=>e.date===ds).forEach(ev=>{
+      const p=proj(ev.projectId),c=p.color||'#4472C4';
+      html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}" onclick="event.stopPropagation();openEditItem('proj','${ev.id}')">${escH(ev.title)}</div>`;
+    });
+    html+=`</div>`;
+  });
+  html+=`</div></div>`;
+
+  // 통합 일정 목록 (전체 기간)
+  if(filteredTimedEvs.length>0){
+    const cat=hasTimedFilter?timedCat(hasTimedFilter):null;
+    const sortedTes=filteredTimedEvs.sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+    html+=`<div class="card" style="overflow:hidden;margin-bottom:12px">
+      <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px">
+        ${cat?`<span style="width:10px;height:10px;border-radius:50%;background:${cat.color};display:inline-block"></span>${cat.emoji?cat.emoji+' ':''}${escH(cat.name)}`:'⏰ Timed Events'} 전체 일정
+        <span style="font-size:11px;color:var(--text3);font-weight:400;margin-left:auto">${sortedTes.length}개</span>
+      </div>`;
+    sortedTes.forEach(te=>{
+      const c=timedCat(te.categoryId);
+      const memoKey=`te_memo_${te.id}`;
+      const memoVal=data.classMemos[memoKey]||'';
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid var(--border)">
+        <div style="cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:0" onclick="openEditItem('timed','${te.id}')">
+          <span style="font-size:11px;color:var(--text3);width:76px;flex-shrink:0">${te.date}</span>
+          <span style="font-size:11px;font-weight:600;color:${c.color||'#4472C4'};width:36px;flex-shrink:0">${te.time}</span>
+          <span style="font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${escH(te.title)}</span>
+          ${!hasTimedFilter&&c.name?`<span style="font-size:10px;color:${c.color};flex-shrink:0">${c.emoji||''}${c.name}</span>`:''}
+        </div>
+        <input type="text" value="${escH(memoVal)}" placeholder=""
+          style="flex:1;min-width:0;padding:4px 10px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font);margin-left:8px"
+          onblur="saveEvMemo('te_${te.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()" onclick="event.stopPropagation()">
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+  if(filteredProjEvs.length>0){
+    const p=hasProjFilter?proj(hasProjFilter):null;
+    const sortedEvs=filteredProjEvs.sort((a,b)=>a.date.localeCompare(b.date));
+    html+=`<div class="card" style="overflow:hidden">
+      <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px">
+        ${p?`<span style="width:10px;height:10px;border-radius:50%;background:${p.color};display:inline-block"></span>${escH(p.name)}`:'📁 Projects'} 전체 일정
+        <span style="font-size:11px;color:var(--text3);font-weight:400;margin-left:auto">${sortedEvs.length}개</span>
+      </div>`;
+    sortedEvs.forEach(ev=>{
+      const pr=proj(ev.projectId);
+      const memoKey=`ev_memo_${ev.id}`;
+      const memoVal=data.classMemos[memoKey]||ev.note||'';
+      html+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid var(--border)">
+        <div style="cursor:pointer;display:flex;align-items:center;gap:8px;flex-shrink:0" onclick="openEditItem('proj','${ev.id}')">
+          <span style="font-size:11px;color:var(--text3);width:76px;flex-shrink:0">${ev.date}</span>
+          ${!hasProjFilter?`<span style="font-size:11px;font-weight:600;color:${pr.color};white-space:nowrap;flex-shrink:0">${pr.name}</span>`:''}
+          <span style="font-size:13px;white-space:nowrap">${escH(ev.title)}</span>
+        </div>
+        <input type="text" value="${escH(memoVal)}" placeholder=""
+          style="flex:1;min-width:0;padding:4px 10px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font);margin-left:8px"
+          onblur="saveEvMemo('${ev.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()" onclick="event.stopPropagation()">
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+  document.getElementById('main-content').innerHTML=html;
+}
+
+
+// ── Year ──────────────────────────────────────────────────
+function renderYear(){
+  const yr=state.cursor.getFullYear(),todS=todayStr();
+  let html=`<div class="year-view">`;
+  for(let mo=0;mo<12;mo++){
+    html+=`<div class="card" style="padding:12px"><div style="font-size:12px;font-weight:500;margin-bottom:8px">${MONTHS[mo]}</div><div class="year-mini">`;
+    ['M','T','W','T','F','S','S'].forEach((d,i)=>html+=`<div class="year-dow" style="${i===5?'color:var(--accent)':i===6?'color:var(--red)':''}">${d}</div>`);
+    const first=new Date(yr,mo,1),last=new Date(yr,mo+1,0);
+    const offset=(first.getDay()||7)-1;
+    for(let i=0;i<offset;i++)html+=`<div class="year-day other"></div>`;
+    for(let d=1;d<=last.getDate();d++){
+      const ds=ym(yr,mo,d),isT=ds===todS;
+      const hasEv=data.projEvents.some(e=>e.date===ds)||data.tasks.some(t=>t.date===ds&&!t.eventId)||data.timedEvents.some(t=>t.date===ds);
+      const dow=new Date(yr,mo,d).getDay(),di=dow===0?6:dow-1;
+      const holiday=isHol(ds);
+      const cls='year-day'+(isT?' today':hasEv?' has-ev':'')+(holiday&&!isT?' sun':di===5&&!isT?' sat':di===6&&!isT?' sun':'');
+      html+=`<div class="${cls}" onclick="jumpToDay('${ds}')">${d}</div>`;
+    }
+    html+=`</div></div>`;
+  }
+  html+=`</div>`;
+  document.getElementById('main-content').innerHTML=html;
+}
+// ── Day View ──────────────────────────────────────────────
+if(!window.dayBlocks)window.dayBlocks={};
+if(!window.dayBlockCols)window.dayBlockCols=['','',''];
+function renderDay(){
+  const ds=fmtDate(state.cursor);
+  const tes=timedEventsOn(ds),pevs=projEventsOn(ds),alltds=tasksOn(ds);
+  const hol=holName(ds);
+  if(!window.dayBlocks[ds])window.dayBlocks[ds]={};
+
+  // Time block columns - 3 fixed, user-named
+  const cols=window.dayBlockCols;
+
+  let html=`<div class="day-view">`;
+
+  // Events header
+  html+=`<div class="card" style="overflow:hidden">
+    <div style="padding:9px 14px;font-size:13px;font-weight:500;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+      ${state.cursor.getMonth()+1}월 ${state.cursor.getDate()}일
+      ${hol?`<span style="color:var(--red);font-size:11px;font-weight:400">· ${hol}</span>`:''}
+      <button onclick="openAddModal('${ds}')" class="btn-save" style="margin-left:auto;border-radius:16px;font-size:11px;padding:4px 12px">+ Add</button>
+    </div>`;
+
+  // Timed events strip
+  if(tes.length>0){
+    html+=`<div style="padding:7px 12px;display:flex;flex-wrap:wrap;gap:5px;border-bottom:1px solid var(--border)">`;
+    tes.forEach(te=>{const cat=timedCat(te.categoryId),c=cat.color||'#4472C4';html+=`<div style="background:${evBg(c)};color:${evTxt(c)};border-radius:12px;padding:3px 10px;font-size:12px;cursor:pointer;display:flex;gap:4px;align-items:center" onclick="openEditItem('timed','${te.id}')"><span style="font-weight:600">${te.time}</span><span>${cat.emoji?cat.emoji+' ':''}${escH(te.title)}</span></div>`;});
+    html+=`</div>`;
+  }
+
+  // Project events
+  if(pevs.length>0){
+    html+=`<div style="padding:7px 12px;display:flex;flex-wrap:wrap;gap:5px;border-bottom:1px solid var(--border)">`;
+    pevs.forEach(ev=>{const p=proj(ev.projectId),c=p.color||'#4472C4';html+=`<div style="background:${evBg(c)};color:${evTxt(c)};border-radius:8px;padding:3px 10px;font-size:12px;cursor:pointer" onclick="openEditItem('proj','${ev.id}')"><span style="font-size:10px;opacity:.7">${p.name}</span> ${escH(ev.title)}</div>`;});
+    html+=`</div>`;
+  }
+
+  if(tes.length+pevs.length===0)html+=`<div class="empty">No events today</div>`;
+  html+=`</div>`;
+
+  // Time blocks — columns = active projects today
+  html+=`<div class="day-tb-grid" style="display:grid;grid-template-columns:3fr 2fr;gap:12px;align-items:start">`;
+  html+=`<div class="day-tb-col card" style="overflow:hidden">
+    <div style="padding:9px 14px;font-size:13px;font-weight:500;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      Time Blocks
+      <div style="display:flex;gap:4px;margin-left:auto">
+        ${cols.map((c,i)=>`<input type="text" value="${c}" placeholder="Col ${i+1}"
+          style="width:60px;padding:2px 5px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:11px;background:var(--bg);color:var(--text);outline:none;text-align:center"
+          onblur="setBlockCol(${i},this.value)" onkeydown="if(event.key==='Enter')this.blur()">`).join('')}
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:32px repeat(3,1fr);border-bottom:1px solid var(--border);background:var(--surface2)">
+      <div></div>`;
+  cols.forEach((c,i)=>html+=`<div style="font-size:10px;font-weight:600;color:var(--accent);padding:5px 4px;text-align:center;border-left:1px solid var(--border)">${escH(c)}</div>`);
+  html+=`</div>`;
+  const hrs=[];for(let h=7;h<=30;h++)hrs.push(h%24);
+  hrs.forEach((h,hi)=>{
+    const hs=String(h).padStart(2,'0')+':00';
+    html+=`<div style="display:grid;grid-template-columns:32px repeat(3,1fr);border-bottom:1px solid var(--border);min-height:26px">
+      <div style="font-size:9px;color:var(--text3);padding:2px 2px 0;text-align:right;line-height:1">${hs}</div>`;
+    cols.forEach((colName,ci)=>{
+      const key=`${h}_col${ci}`;
+      const has=key in window.dayBlocks[ds];
+      const val=has?window.dayBlocks[ds][key]:'';
+      const prevH=hi>0?hrs[hi-1]:null;
+      const isFirst=has&&(!prevH||(!((`${prevH}_col${ci}`) in window.dayBlocks[ds])));
+      html+=`<div data-h="${h}" data-pid="col${ci}" data-ds="${ds}"
+        style="border-left:1px solid var(--border);padding:2px 3px;cursor:crosshair;user-select:none;${has?'background:var(--accent-bg);':''}"
+        onmousedown="startBlockDrag(event,'${ds}',${h},'col${ci}')"
+        onmouseenter="continueBlockDrag(event,'${ds}',${h},'col${ci}')"
+        onmouseup="endBlockDrag()"
+        ontouchstart="startBlockDrag(event,'${ds}',${h},'col${ci}')"
+        ontouchmove="touchMoveBlock(event)"
+        ontouchend="endBlockDrag()">
+        ${isFirst?`<input type="text" value="${escH(val)}" placeholder="note..."
+          style="width:100%;border:none;background:transparent;font-size:10px;color:var(--accent-txt);outline:none;font-family:var(--font);pointer-events:auto"
+          onmousedown="event.stopPropagation()"
+          onblur="saveBlock('${ds}',${h},'col${ci}',this.value)"
+          onkeydown="if(event.key==='Enter')this.blur()">`:''}
+      </div>`;
+    });
+    html+=`</div>`;
+  });
+  html+=`</div>`; // close timeblock card
+  // Tasks - right column
+  html+=`<div class="day-task-col card" style="overflow:hidden;overflow-y:auto;max-height:700px">
+    <div style="padding:9px 14px;font-size:13px;font-weight:500;border-bottom:1px solid var(--border)">Tasks</div>`;
+  const linkedIds=new Set();
+  pevs.forEach(ev=>{
+    const subs=alltds.filter(t=>t.eventId===ev.id);
+    if(!subs.length)return;
+    const p=proj(ev.projectId),c=p.color||'#4472C4';
+    html+=`<div style="padding:5px 14px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:${c};cursor:pointer;padding:3px 0" onclick="openEditItem('proj','${ev.id}')">
+        <span style="width:6px;height:6px;border-radius:50%;background:${c};display:inline-block"></span>${escH(ev.title)}
+      </div>
+      <div style="padding-left:14px">`;
+    subs.forEach(td=>{
+      linkedIds.add(td.id);
+      html+=`<div class="todo-item" style="padding:3px 0"><input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked)"><span class="todo-txt${td.done?' done':''}" style="flex:1">${escH(td.title)}</span><button class="todo-del" onclick="deleteTask('${td.id}')">✕</button></div>`;
+    });
+    html+=`<div style="padding:3px 0"><input type="text" placeholder="+ Add subtask..." style="width:100%;padding:3px 0;border:none;border-bottom:1px dashed var(--border2);font-size:12px;background:transparent;outline:none;font-family:var(--font);color:var(--text)" onkeydown="if(event.key==='Enter')addLinkedTask('${ev.id}','${ds}','${ev.projectId||''}',this)"></div>
+      </div></div>`;
+  });
+  const unlinked=alltds.filter(t=>!linkedIds.has(t.id)&&!t.eventId);
+  unlinked.forEach(td=>{
+    const p=proj(td.projectId),c=p.color||'#999';
+    html+=`<div class="todo-item"><input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked)"><div style="flex:1;min-width:0"><div class="todo-txt${td.done?' done':''}">${escH(td.title)}</div>${p.name?`<div style="font-size:10px;color:${c}">${p.name}</div>`:''}</div><button class="todo-del" onclick="deleteTask('${td.id}')">✕</button></div>`;
+  });
+  if(alltds.length===0)html+=`<div class="empty">No tasks</div>`;
+  html+=`<div class="quick-add">
+    <input type="text" id="day-task-inp" placeholder="Add task..." onkeydown="if(event.key==='Enter')addDayTask('${ds}')">
+    <button onclick="addDayTask('${ds}')">+</button>
+  </div></div></div>`; // close tasks card + grid wrapper
+  html+=`</div>`;
+  document.getElementById('main-content').innerHTML=html;
+}
+
+// Block drag
+let _drag=null;
+function startBlockDrag(e,ds,h,pid){e.preventDefault();if(!window.dayBlocks[ds])window.dayBlocks[ds]={};const key=`${h}_${pid}`;const mode=(key in window.dayBlocks[ds])?'remove':'add';_drag={ds,pid,mode};if(mode==='add')window.dayBlocks[ds][key]='';else delete window.dayBlocks[ds][key];renderDay();}
+function continueBlockDrag(e,ds,h,pid){if(!_drag||_drag.pid!==pid||_drag.ds!==ds)return;e.preventDefault();if(!window.dayBlocks[ds])window.dayBlocks[ds]={};const key=`${h}_${pid}`;if(_drag.mode==='add'){if(!(key in window.dayBlocks[ds])){window.dayBlocks[ds][key]='';renderDay();}}else{if(key in window.dayBlocks[ds]){delete window.dayBlocks[ds][key];renderDay();}}}
+function endBlockDrag(){_drag=null;}
+function touchMoveBlock(e){if(!_drag)return;e.preventDefault();const t=e.touches[0];const el=document.elementFromPoint(t.clientX,t.clientY);if(!el)return;const cell=el.closest('[data-h][data-pid]');if(!cell)return;continueBlockDrag(e,cell.dataset.ds,parseInt(cell.dataset.h),cell.dataset.pid);}
+document.addEventListener('mouseup',()=>_drag=null);
+function setBlockCol(i,name){
+  window.dayBlockCols[i]=name||['작업','학습','기타'][i];
+  renderDay();
+}
+function saveBlock(ds,h,pid,val){if(!window.dayBlocks[ds])window.dayBlocks[ds]={};const key=`${h}_${pid}`;if(val.trim()==='')delete window.dayBlocks[ds][key];else window.dayBlocks[ds][key]=val.trim();renderDay();}
+// ── HAEGOBJ ──────────────────────────────────────────────
+function renderHaegobj(){
+  const todS=todayStr();
+  // cursor 기준 해당 주 월요일
+  const base=new Date(state.cursor);
+  const dow=base.getDay();
+  const diffToMon=dow===0?-6:1-dow;
+  base.setDate(base.getDate()+diffToMon);
+
+  // 3주치 날짜 준비
+  const weeks=[];
+  for(let w=0;w<3;w++){
+    const wDays=[];
+    for(let d=0;d<7;d++){
+      const day=new Date(base);
+      day.setDate(base.getDate()+w*7+d);
+      wDays.push(fmtDate(day));
+    }
+    weeks.push(wDays);
+  }
+
+  const startDs=weeks[0][0],endDs=weeks[2][6];
+  const sl=parseDate(startDs),el=parseDate(endDs);
+
+  let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <span style="font-size:13px;font-weight:600;font-family:var(--font-ui);margin-left:4px">
+      ${sl.getFullYear()}년 ${sl.getMonth()+1}월 ${sl.getDate()}일 — ${el.getMonth()+1}월 ${el.getDate()}일
+    </span>
+  </div>`;
+
+  // 3주 나란히 (가로 스크롤)
+  html+=`<div class="haegobj-weeks" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:8px">`;
+
+  weeks.forEach((wDays,wi)=>{
+    const wStart=parseDate(wDays[0]),wEnd=parseDate(wDays[6]);
+    const wLabel=`${wStart.getMonth()+1}/${wStart.getDate()} — ${wEnd.getMonth()+1}/${wEnd.getDate()}`;
+
+    html+=`<div class="card" style="flex:1;min-width:260px;overflow:hidden">
+      <div style="padding:8px 10px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text3)">${wLabel}</div>`;
+
+    wDays.forEach((ds,di)=>{
+      const d=parseDate(ds);
+      const isToday=ds===todS;
+      const dowKo=['일','월','화','수','목','금','토'][d.getDay()];
+      const isSat=d.getDay()===6,isSun=d.getDay()===0;
+      const hol=holName(ds);
+      const numColor=hol||isSun?'var(--red)':isSat?'var(--accent)':'var(--text2)';
+      const memo=data.haegobjMemos[ds]||'';
+
+      html+=`<div style="display:grid;grid-template-columns:52px 1fr;border-bottom:${di<6?'1px solid var(--border)':'none'};${isToday?'background:rgba(45,107,228,0.04);':''}">
+        <!-- 요일+날짜 -->
+        <div style="padding:8px 6px;border-right:1px solid var(--border);text-align:center;background:${isToday?'var(--accent-bg)':hol?'var(--red-bg)':'var(--surface2)'};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+          <div style="font-size:10px;font-weight:600;color:${isToday?'var(--accent)':numColor}">${dowKo}</div>
+          <div style="font-size:16px;font-weight:700;color:${isToday?'var(--accent)':numColor};line-height:1">${d.getDate()}</div>
+          ${hol?`<div style="font-size:8px;color:var(--red);line-height:1.2;text-align:center">${hol}</div>`:''}
+        </div>
+        <!-- 메모 -->
+        <textarea id="hobj-${ds}" placeholder=""
+          style="width:100%;min-height:98px;padding:4px 6px;border:none;background:transparent;font-size:11px;font-family:var(--font);color:var(--text);outline:none;resize:none;line-height:1.5"
+          onfocus="this.style.background='var(--accent-bg)'"
+          onblur="this.style.background='transparent';saveHaegobjMemo('${ds}',this.value)"
+        ></textarea>
+      </div>`;
+    });
+
+    html+=`</div>`;
+  });
+
+  html+=`</div>`;
+  document.getElementById('main-content').innerHTML=html;
+
+  // textarea 값 설정
+  weeks.forEach(wDays=>{
+    wDays.forEach(ds=>{
+      const el=document.getElementById('hobj-'+ds);
+      if(el)el.value=data.haegobjMemos[ds]||'';
+    });
+  });
+}
+
+let _haegobjTimer={};
+function saveHaegobjMemo(ds,val){
+  data.haegobjMemos[ds]=val;
+  clearTimeout(_haegobjTimer[ds]);
+  _haegobjTimer[ds]=setTimeout(async()=>{
+    setSyncing();
+    const{error}=await sb.from('class_memos').upsert(
+      {user_id:currentUser.id,project_id:`haegobj_${ds}`,week:0,content:val},
+      {onConflict:'user_id,project_id,week'}
+    );
+    if(error)setSyncErr('Save Error');else setSynced();
+  },1000);
+}
+
+
+// ── Golf ──────────────────────────────────────────────────
+function renderGolf(){
+  const yr=state.cursor.getFullYear(),mo=state.cursor.getMonth();
+  const lastDay=new Date(yr,mo+1,0),firstDow=new Date(yr,mo,1).getDay();
+  const offset=(firstDow||7)-1;
+  let totalBase=0,totalOver=0,totalRounds=0,totalDays=0;
+  for(let d=1;d<=lastDay.getDate();d++){
+    const ds=ym(yr,mo,d),g=data.golf[ds];
+    const rounds=g&&Array.isArray(g.rounds)?g.rounds:[];
+    rounds.forEach(r=>{if(Number(r.amount)>0){totalBase+=Number(r.amount)||0;totalOver+=Number(r.overFee)||0;totalRounds++;}});
+    if(rounds.some(r=>Number(r.amount)>0))totalDays++;
+  }
+    let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월</span>
+  </div>`;
+  html+=`<div class="work-layout"><div class="card" style="overflow:hidden">
+    <div style="padding:7px;font-size:11px;color:var(--text2);text-align:center;border-bottom:1px solid var(--border)">라운드 기록</div>
+    <div class="work-cal-hdr">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d,i)=>`<div class="work-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`).join('')}</div>
+    <div class="work-grid">`;
+  for(let i=0;i<offset;i++)html+=`<div class="work-cell empty"></div>`;
+  for(let d=1;d<=lastDay.getDate();d++){
+    const ds=ym(yr,mo,d),g=data.golf[ds];
+    const rounds=g&&Array.isArray(g.rounds)?g.rounds:[];
+    const weather=g&&g.weather?g.weather:'';
+    const dow=new Date(yr,mo,d).getDay(),isTod=ds===todayStr();
+    const hasWork=rounds.length>0||!!weather;
+    const holiday=isHol(ds)&&!isTod;
+    let content='';
+    if(weather)content+=`<div style="font-size:15px;line-height:1;margin-bottom:2px" onclick="openGolfModal('${ds}')">${weather}</div>`;
+    if(rounds.length>0){
+      rounds.forEach(r=>{const base=Number(r.amount)||0,over=Number(r.overFee)||0;content+=`<div class="golf-round-tag" onclick="openGolfModal('${ds}')"><span class="golf-holes">${r.holes}H</span><span style="color:var(--text2);font-size:10px">${base.toLocaleString()}${over>0?`<span style="color:#0891B2"> +${over.toLocaleString()}</span>`:''}</span></div>`;});
+      if(rounds.length<2)content+=`<div class="golf-add" onclick="openGolfModal('${ds}')">+</div>`;
+      if(g&&g.memo)content+=`<div style="font-size:9px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:1px 2px">${escH(g.memo)}</div>`;
+    } else if(!weather){content=`<div class="golf-empty" onclick="openGolfModal('${ds}')">+</div>`;}
+    html+=`<div class="work-cell golf-cell${isTod?' today':''}${holiday?' sun':dow===6&&!isTod?' sat':dow===0&&!isTod?' sun':''}${rounds.some(r=>Number(r.amount)>0)?' golf-worked':''}">
+      <div class="work-num" style="${holiday?'color:var(--red)':''}">${d}${holiday?`<span style="font-size:8px;margin-left:2px">${holName(ds)}</span>`:''}${rounds.length>1?` <span style="font-size:9px;color:#BA7517">×${rounds.length}</span>`:''}</div>
+      ${content}
+    </div>`;
+  }
+  html+=`</div></div>`;
+  // Summary - same height concept via min-content
+  html+=`<div><div class="card" style="padding:16px">
+    <div style="font-size:13px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:7px"><span style="width:9px;height:9px;border-radius:50%;background:#BA7517;display:inline-block"></span>이달 현황</div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:7px"><span style="font-size:12px;color:var(--text2)">근무일</span><span style="font-size:12px;font-weight:600">${totalDays}일</span></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:12px"><span style="font-size:12px;color:var(--text2)">총 라운드</span><span style="font-size:12px;font-weight:600">${totalRounds}회</span></div>
+    <div style="height:1px;background:var(--border);margin-bottom:12px"></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:12px;color:var(--text2)">캐디피</span><span style="font-size:12px;font-weight:600">${totalBase.toLocaleString()}원</span></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:12px"><span style="font-size:12px;color:#0891B2">오버피</span><span style="font-size:12px;font-weight:600;color:#0891B2">+${totalOver.toLocaleString()}원</span></div>
+    <div style="padding:10px;background:var(--surface2);border-radius:var(--radius-sm);text-align:center">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:3px">합계</div>
+      <div style="font-size:20px;font-weight:700;color:#BA7517">${(totalBase+totalOver).toLocaleString()}원</div>
+    </div>
+  </div></div>`;
+
+  // 연간 월별 통계
+  const statYr=state.cursor.getFullYear();
+  let yearHtml=`<div class="card" style="margin-top:12px;padding:14px">
+    <div style="font-size:12px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+      <span style="width:8px;height:8px;border-radius:50%;background:#BA7517;display:inline-block"></span>${statYr}년 월별 현황
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <tr style="border-bottom:2px solid var(--border)">
+        <th style="padding:4px 6px;text-align:left;color:var(--text3);font-weight:600">월</th>
+        <th style="padding:4px 6px;text-align:right;color:var(--text3);font-weight:600">라운드</th>
+        <th style="padding:4px 6px;text-align:right;color:var(--text3);font-weight:600">캐디피</th>
+        <th style="padding:4px 6px;text-align:right;color:#0891B2;font-weight:600">오버피</th>
+        <th style="padding:4px 6px;text-align:right;color:#BA7517;font-weight:600">합계</th>
+      </tr>`;
+  let ytBase=0,ytOver=0,ytRounds=0;
+  for(let m=0;m<12;m++){
+    const lastD=new Date(statYr,m+1,0);
+    let mBase=0,mOver=0,mRounds=0;
+    for(let d=1;d<=lastD.getDate();d++){
+      const ds=ym(statYr,m,d),g=data.golf[ds];
+      const rounds=g&&Array.isArray(g.rounds)?g.rounds:[];
+      rounds.forEach(r=>{if(Number(r.amount)>0){mBase+=Number(r.amount)||0;mOver+=Number(r.overFee)||0;mRounds++;}});
+    }
+    ytBase+=mBase;ytOver+=mOver;ytRounds+=mRounds;
+    if(mRounds===0)continue;
+    yearHtml+=`<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:4px 6px;font-weight:500">${m+1}월</td>
+      <td style="padding:4px 6px;text-align:right">${mRounds}회</td>
+      <td style="padding:4px 6px;text-align:right">${mBase.toLocaleString()}</td>
+      <td style="padding:4px 6px;text-align:right;color:#0891B2">${mOver>0?'+'+mOver.toLocaleString():'-'}</td>
+      <td style="padding:4px 6px;text-align:right;font-weight:600;color:#BA7517">${(mBase+mOver).toLocaleString()}</td>
+    </tr>`;
+  }
+  yearHtml+=`<tr style="background:var(--surface2);font-weight:700">
+    <td style="padding:5px 6px">합계</td>
+    <td style="padding:5px 6px;text-align:right">${ytRounds}회</td>
+    <td style="padding:5px 6px;text-align:right">${ytBase.toLocaleString()}</td>
+    <td style="padding:5px 6px;text-align:right;color:#0891B2">${ytOver>0?'+'+ytOver.toLocaleString():'-'}</td>
+    <td style="padding:5px 6px;text-align:right;color:#BA7517">${(ytBase+ytOver).toLocaleString()}</td>
+  </tr></table></div>`;
+  html+=`</div>`+yearHtml;
+  document.getElementById('main-content').innerHTML=html;
+}
+function openGolfModal(ds){
+  const g=data.golf[ds];
+  let rounds=g&&Array.isArray(g.rounds)?JSON.parse(JSON.stringify(g.rounds)):[];
+  if(rounds.length===0)rounds.push({holes:18,amount:'',overFee:''});
+  window._gRounds=rounds;window._gWx=g&&g.weather?g.weather:'';window._gDs=ds;
+  const d=parseDate(ds);
+  document.getElementById('golf-modal-date').textContent=`${d.getMonth()+1}월 ${d.getDate()}일`;
+  document.getElementById('golf-modal-ds').value=ds;
+  document.getElementById('golf-memo').value=g&&g.memo?g.memo:'';
+  document.querySelectorAll('.golf-wx-btn').forEach(b=>b.classList.toggle('active',b.textContent===window._gWx));
+  renderGolfRounds();
+  document.getElementById('golf-modal').style.display='flex';
+  pushUiState('golf-modal');
+}
+function renderGolfRounds(){
+  const rounds=window._gRounds;
+  let html=rounds.map((r,i)=>`
+    <div style="padding:10px 12px;background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:11px;font-weight:600;color:var(--text2)">${i===0?'1라운드':'2라운드'}</span>
+        ${i>0?`<button onclick="removeGolfRound(${i})" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:11px">✕ 삭제</button>`:''}
+      </div>
+      <div style="display:flex;gap:7px;align-items:flex-end">
+        <div>
+          <div style="font-size:10px;color:var(--text2);margin-bottom:3px">홀수</div>
+          <div style="display:flex;gap:3px">
+            <button class="golf-hole-btn${Number(r.holes)===9?' active':''}" onclick="setGolfHoles(${i},9)">9H</button>
+            <button class="golf-hole-btn${Number(r.holes)===18?' active':''}" onclick="setGolfHoles(${i},18)">18H</button>
+            <input class="golf-hole-custom" type="number" min="1" max="27" placeholder="직접" value="${[9,18].includes(Number(r.holes))?'':r.holes}" oninput="setGolfHolesCustom(${i},this.value)">
+          </div>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:10px;color:var(--text2);margin-bottom:3px">캐디피 (만원)</div>
+          <input class="golf-amt" type="text" inputmode="numeric" placeholder="예: 15" value="${r.amount?(Number(r.amount)/10000):''}" oninput="setGolfAmt(${i},this.value)" onfocus="this.select()">
+        </div>
+        <div style="width:90px">
+          <div style="font-size:10px;color:#0891B2;margin-bottom:3px">오버피 (만원)</div>
+          <input class="golf-amt" type="text" inputmode="decimal" placeholder="예: 2.5" style="border-color:#0891B2;color:#0891B2" value="${r.overFee?(Number(r.overFee)/10000):''}" oninput="setGolfOver(${i},this.value)" onfocus="this.select()">
+        </div>
+      </div>
+    </div>${i<rounds.length-1?'<hr style="border:none;border-top:1px solid var(--border);margin:4px 0">':''}
+  `).join('');
+  document.getElementById('golf-rounds').innerHTML=html;
+  document.getElementById('golf-add-round-btn').style.display=rounds.length>=2?'none':'';
+}
+function setGolfWx(icon){window._gWx=window._gWx===icon?'':icon;document.querySelectorAll('.golf-wx-btn').forEach(b=>b.classList.toggle('active',b.textContent===window._gWx));}
+function setGolfHoles(i,h){window._gRounds[i].holes=h;renderGolfRounds();}
+function setGolfHolesCustom(i,v){const h=parseInt(v);if(h>0)window._gRounds[i].holes=h;}
+const toWon=v=>{const s=String(v).replace(/,/g,'').replace(/[^0-9.]/g,'');const n=Number(s);if(!n)return'';return n<1000?Math.round(n*10000):n;};
+function setGolfAmt(i,v){window._gRounds[i].amount=toWon(v);}
+function setGolfOver(i,v){window._gRounds[i].overFee=toWon(v);}
+function addGolfRound(){window._gRounds.push({holes:18,amount:'',overFee:''});renderGolfRounds();}
+function removeGolfRound(i){window._gRounds.splice(i,1);renderGolfRounds();}
+async function saveGolfModal(){
+  const ds=window._gDs;
+  const fields=document.querySelectorAll('.golf-amt');
+  let fi=0;
+  window._gRounds.forEach(r=>{if(fields[fi])r.amount=toWon(fields[fi++].value);if(fields[fi])r.overFee=toWon(fields[fi++].value);});
+  const valid=window._gRounds.filter(r=>Number(r.amount)>0);
+  const wx=window._gWx||'';
+  const memo=document.getElementById('golf-memo').value.trim();
+  const rec={rounds:valid,weather:wx,memo};
+  if(valid.length>0||wx||memo){data.golf[ds]=rec;}else{delete data.golf[ds];}
+  closeGolfModal();renderGolf();
+  await saveGolfRec(ds,(valid.length>0||wx||memo)?rec:null);
+}
+async function clearGolfDay(){delete data.golf[window._gDs];closeGolfModal();renderGolf();await saveGolfRec(window._gDs,null);}
+function closeGolfModal(){document.getElementById('golf-modal').style.display='none';}
+
+// ── Studio ────────────────────────────────────────────────
+function renderStudio(){
+  const yr=state.cursor.getFullYear(),mo=state.cursor.getMonth();
+  const lastDay=new Date(yr,mo+1,0),firstDow=new Date(yr,mo,1).getDay();
+  const offset=(firstDow||7)-1;
+  let offDays=0,offMins=0,actualMins=0;
+  for(let d=1;d<=lastDay.getDate();d++){
+    const ds=ym(yr,mo,d),rec=data.office[ds];
+    if(rec&&rec.in&&rec.out){const diff=timeDiff(rec.in,rec.out);if(diff>0){actualMins+=diff;offMins+=Math.min(diff,600);offDays++;}}
+  }
+  const offH=offMins/60,actH=actualMins/60;
+  const hrPct=Math.min(100,Math.round(offH/100*100)),dayPct=Math.min(100,Math.round(offDays/10*100));
+  const hrDone=offH>=100,dayDone=offDays>=10;
+    let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월</span>
+  </div>`;
+  html+=`<div class="work-layout"><div class="card" style="overflow:hidden">
+    <div style="padding:7px;font-size:11px;color:var(--text2);text-align:center;border-bottom:1px solid var(--border)">출퇴근 시간</div>
+    <div class="work-cal-hdr">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d,i)=>`<div class="work-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`).join('')}</div>
+    <div class="work-grid">`;
+  for(let i=0;i<offset;i++)html+=`<div class="work-cell empty"></div>`;
+  for(let d=1;d<=lastDay.getDate();d++){
+    const ds=ym(yr,mo,d),rec=data.office[ds]||{};
+    const dow=new Date(yr,mo,d).getDay(),isTod=ds===todayStr();
+    const diff=rec.in&&rec.out?timeDiff(rec.in,rec.out):0;
+    const capped=Math.min(diff,600);
+    const lbl=diff>0?`${Math.floor(diff/60)}h${diff%60>0?String(diff%60).padStart(2,'0')+'m':''}${diff>600?` (${Math.floor(capped/60)}h)`:''}`:'';
+    const holiday=isHol(ds)&&!isTod;
+    let studioContent='';
+    if(diff>0){
+      studioContent=`<div style="font-size:10px;color:#0891B2;margin-top:3px;cursor:pointer" onclick="openStudioModal('${ds}')">
+        <div>▶ ${rec.in||''}</div>
+        <div>◀ ${rec.out||''}</div>
+        <div style="font-weight:600;margin-top:2px">${lbl}</div>
+      </div>`;
+    } else {
+      studioContent=`<div class="golf-empty" onclick="openStudioModal('${ds}')">+</div>`;
+    }
+    html+=`<div class="work-cell office-cell${isTod?' today':''}${holiday?' sun':dow===6&&!isTod?' sat':dow===0&&!isTod?' sun':''}${diff>0?' worked':''}">
+      <div class="work-num" style="display:flex;align-items:center;justify-content:space-between;${holiday?'color:var(--red)':''}">
+        <span>${d}${holiday?`<span style="font-size:8px;margin-left:2px">${holName(ds)}</span>`:''}</span>
+        ${diff>0?`<span onclick="openStudioModal('${ds}')" style="font-size:9px;color:var(--text3);cursor:pointer">✎</span>`:''}
+      </div>
+      ${studioContent}
+    </div>`;
+  }
+  html+=`</div></div>`;
+  html+=`<div><div class="card" style="padding:16px">
+    <div style="font-size:13px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:7px"><span style="width:9px;height:9px;border-radius:50%;background:#0891B2;display:inline-block"></span>이달 현황</div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:12px;color:var(--text2)">실제 근무</span><span style="font-size:12px;font-weight:600;color:var(--text3)">${actH.toFixed(1)}h</span></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:12px;color:var(--text2)">반영 시간</span><span style="font-size:12px;font-weight:600;color:${hrDone?'var(--green)':'var(--text)'}">${offH.toFixed(1)} / 100h ${hrDone?'✓':''}</span></div>
+    <div class="work-bar-bg"><div class="work-bar-fill" style="width:${hrPct}%;background:${hrDone?'var(--green)':'#0891B2'}"></div></div>
+    <div style="display:flex;justify-content:space-between;margin-top:10px;margin-bottom:5px"><span style="font-size:12px;color:var(--text2)">출근 일수</span><span style="font-size:12px;font-weight:600;color:${dayDone?'var(--green)':'var(--text)'}">${offDays} / 10일 ${dayDone?'✓':''}</span></div>
+    <div class="work-bar-bg"><div class="work-bar-fill" style="width:${dayPct}%;background:${dayDone?'var(--green)':'#0891B2'}"></div></div>
+    <div style="margin-top:12px;padding:10px;background:${hrDone&&dayDone?'var(--green-bg)':'var(--surface2)'};border-radius:var(--radius-sm);text-align:center;font-size:12px;font-weight:600;color:${hrDone&&dayDone?'var(--green-txt)':'var(--text3)'}">
+      ${hrDone&&dayDone?'✓ 이달 조건 달성!':'조건 미충족'}
+    </div>
+  </div></div></div>`;
+  document.getElementById('main-content').innerHTML=html;
+}
+function openStudioModal(ds){
+  const rec=data.office[ds]||{};
+  const d=parseDate(ds);
+  document.getElementById('studio-modal-date').textContent=`${d.getMonth()+1}월 ${d.getDate()}일`;
+  document.getElementById('studio-modal-ds').value=ds;
+  document.getElementById('studio-in').value=rec.in||'';
+  document.getElementById('studio-out').value=rec.out||'';
+  document.getElementById('studio-del-btn').style.display=rec.in||rec.out?'':'none';
+  document.getElementById('studio-modal').style.display='flex';
+  pushUiState('studio-modal');
+}
+function closeStudioModal(){document.getElementById('studio-modal').style.display='none';}
+async function studioModalSave(){
+  const ds=document.getElementById('studio-modal-ds').value;
+  const inV=document.getElementById('studio-in').value;
+  const outV=document.getElementById('studio-out').value;
+  const rec={in:inV,out:outV};
+  data.office[ds]=rec;
+  closeStudioModal();renderStudio();
+  await saveOfficeRec(ds,rec);
+}
+async function studioModalDel(){
+  const ds=document.getElementById('studio-modal-ds').value;
+  delete data.office[ds];
+  closeStudioModal();renderStudio();
+  await saveOfficeRec(ds,null);
+}
+async function studioDel(ds){delete data.office[ds];renderStudio();await saveOfficeRec(ds,null);}
+
+// ── Period ────────────────────────────────────────────────
+function renderPeriod(){
+  const yr=state.cursor.getFullYear(),mo=state.cursor.getMonth();
+  const lastDay=new Date(yr,mo+1,0),firstDow=new Date(yr,mo,1).getDay();
+  const offset=(firstDow||7)-1;
+  const periodDates=new Set(data.periodLogs.map(p=>p.startDate));
+
+  // Calculate cycle info
+  const logs=[...data.periodLogs].sort((a,b)=>a.startDate.localeCompare(b.startDate));
+  let cycles=[];
+  for(let i=1;i<logs.length;i++){
+    const a=parseDate(logs[i-1].startDate),b=parseDate(logs[i].startDate);
+    cycles.push(Math.round((b-a)/(1000*60*60*24)));
+  }
+  const avgCycle=cycles.length?Math.round(cycles.reduce((a,b)=>a+b,0)/cycles.length):28;
+  const lastLog=logs[logs.length-1];
+  const nextDate=lastLog?fmtDate(new Date(parseDate(lastLog.startDate).getTime()+avgCycle*24*60*60*1000)):'';
+
+    let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월</span>
+  </div>`;
+  html+=`<div class="work-layout"><div class="card" style="overflow:hidden">
+    <div style="padding:7px;font-size:11px;color:var(--text2);text-align:center;border-bottom:1px solid var(--border)">생리 기록 (날짜 클릭으로 기록)</div>
+    <div class="work-cal-hdr">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d,i)=>`<div class="work-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`).join('')}</div>
+    <div class="work-grid">`;
+  for(let i=0;i<offset;i++)html+=`<div class="work-cell empty"></div>`;
+  for(let d=1;d<=lastDay.getDate();d++){
+    const ds=ym(yr,mo,d),isPeriod=periodDates.has(ds);
+    const dow=new Date(yr,mo,d).getDay(),isTod=ds===todayStr();
+    html+=`<div class="work-cell${isTod?' today':''}${isPeriod?' period-day':''}${dow===6&&!isTod?' sat':dow===0&&!isTod?' sun':''}" style="cursor:pointer;min-height:90px" onclick="togglePeriod('${ds}')">
+      <div class="work-num">${d}</div>
+      ${isPeriod?`<div style="text-align:center;font-size:16px;margin-top:4px">🌸</div>`:''}
+    </div>`;
+  }
+  html+=`</div></div>`;
+
+  // Summary
+  html+=`<div><div class="card" style="padding:16px">
+    <div style="font-size:13px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:7px"><span style="font-size:16px">🌸</span>주기 정보</div>`;
+  if(avgCycle&&cycles.length>0){
+    html+=`<div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;color:var(--text2)">평균 주기</span><span style="font-size:12px;font-weight:600">${avgCycle}일</span></div>`;
+  }
+  if(lastLog){
+    html+=`<div style="display:flex;justify-content:space-between;margin-bottom:8px"><span style="font-size:12px;color:var(--text2)">마지막 시작</span><span style="font-size:12px;font-weight:600">${lastLog.startDate}</span></div>`;
+    if(nextDate)html+=`<div style="padding:10px;background:var(--pink-bg);border-radius:var(--radius-sm);text-align:center;margin-top:10px"><div style="font-size:11px;color:var(--text3);margin-bottom:3px">예상 다음 시작</div><div style="font-size:15px;font-weight:700;color:var(--pink)">${nextDate}</div></div>`;
+  }
+  html+=`<div style="margin-top:12px;max-height:200px;overflow-y:auto">`;
+  logs.slice().reverse().forEach((l,i)=>{
+    const cycle=i<logs.length-1?cycles[cycles.length-1-i]:null;
+    html+=`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;flex:1">${l.startDate}</span>${cycle?`<span style="font-size:11px;color:var(--text3)">${cycle}일</span>`:''}<button onclick="delPeriodEntry('${l.id}')" class="todo-del" style="font-size:12px">✕</button></div>`;
+  });
+  html+=`</div></div></div></div>`;
+  document.getElementById('main-content').innerHTML=html;
+}
+async function togglePeriod(ds){
+  const existing=data.periodLogs.find(p=>p.startDate===ds);
+  if(existing){
+    data.periodLogs=data.periodLogs.filter(p=>p.id!==existing.id);
+    renderPeriod();
+    await delPeriodLog(existing.id);
+  } else {
+    const log={id:makeId(),startDate:ds};
+    data.periodLogs.push(log);
+    data.periodLogs.sort((a,b)=>b.startDate.localeCompare(a.startDate));
+    renderPeriod();
+    await savePeriodLog(log);
+  }
+}
+async function delPeriodEntry(id){data.periodLogs=data.periodLogs.filter(p=>p.id!==id);renderPeriod();await delPeriodLog(id);}
+// ── Todo List View ───────────────────────────────────────
+function renderTodos(){
+  // cursor 기준 3일 (전날, 오늘, 내일)
+  const base=new Date(state.cursor);
+  const todS=todayStr();
+  const days=[-1,0,1].map(i=>{
+    const d=new Date(base);d.setDate(d.getDate()+i);return fmtDate(d);
+  });
+
+  // 네비게이션 헤더
+  let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+    <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <button onclick="toggleHideDone()" id="hide-done-btn2" class="btn-cancel" style="font-size:11px;padding:3px 10px;border-radius:12px;margin-left:auto">${_hideDone?'Show Done':'Hide Done'}</button>
+  </div>`;
+
+  // 3열 가로 레이아웃
+  html+=`<div class="todos-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:start">`;
+
+  days.forEach((ds,di)=>{
+    const d=parseDate(ds);
+    const isToday=ds===todS;
+    const dow=['일','월','화','수','목','금','토'][d.getDay()];
+    const isSat=d.getDay()===6,isSun=d.getDay()===0;
+    const hol=holName(ds);
+    const numColor=hol||isSun?'var(--red)':isSat?'var(--accent)':'var(--text)';
+
+    // 이날 독립 tasks + proj event 세부항목
+    const dayPevs=data.projEvents.filter(e=>e.date===ds);
+    const dayTasks=data.tasks.filter(t=>t.date===ds&&!t.eventId&&(!_hideDone||!t.done));
+
+    html+=`<div class="card" style="overflow:hidden${isToday?';outline:2px solid var(--accent);outline-offset:-2px':''}">
+      <!-- 날짜 헤더 -->
+      <div style="padding:10px 14px;border-bottom:1px solid var(--border);background:${isToday?'var(--accent-bg)':'var(--surface2)'};display:flex;align-items:center;gap:8px">
+        <div>
+          <div style="font-size:20px;font-weight:700;color:${isToday?'var(--accent)':numColor};line-height:1">${d.getDate()}</div>
+          <div style="font-size:11px;color:${isToday?'var(--accent-txt)':numColor};font-weight:500">${d.getMonth()+1}월 ${dow}${hol?` · ${hol}`:''}</div>
+        </div>
+        ${isToday?'<span style="font-size:10px;background:var(--accent);color:#fff;padding:2px 8px;border-radius:8px;margin-left:4px">오늘</span>':''}
+        <button onclick="openAddTaskModal('${ds}')" style="margin-left:auto;background:none;border:1px solid var(--border2);border-radius:var(--radius-xs);padding:3px 10px;cursor:pointer;font-size:13px;color:var(--text3)">+</button>
+      </div>
+      <!-- 내용 -->
+      <div style="min-height:600px">`;
+
+    // proj event 세부항목 그룹
+    dayPevs.forEach(ev=>{
+      const subs=data.tasks.filter(t=>t.eventId===ev.id&&(!_hideDone||!t.done));
+      if(subs.length===0&&_hideDone)return;
+      const p=proj(ev.projectId),c=p.color||'#4472C4';
+      html+=`<div style="border-bottom:1px solid var(--border)">
+        <div style="padding:6px 14px;background:${evBg(c)};font-size:11px;font-weight:600;color:${evTxt(c)};cursor:pointer;display:flex;align-items:center;gap:5px" onclick="openEditItem('proj','${ev.id}')">
+          <span style="width:5px;height:5px;border-radius:50%;background:${c};display:inline-block"></span>${escH(ev.title)}
+        </div>`;
+      subs.forEach(td=>{
+        html+=`<div class="todo-item" style="padding-left:20px;border-bottom:1px solid var(--border)">
+          <input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked)">
+          <span class="todo-txt${td.done?' done':''}" style="flex:1;font-size:12px">${escH(td.title)}</span>
+          <input type="date" value="${td.date||ds}" title="날짜 변경"
+            style="width:90px;padding:1px 3px;border:1px solid var(--border2);border-radius:3px;font-size:10px;background:var(--bg);color:var(--text);outline:none"
+            onchange="changeSubDate('${td.id}',this.value)">
+          <button class="todo-del" onclick="deleteTask('${td.id}')">✕</button>
+        </div>`;
+      });
+      html+=`<div style="padding:3px 14px 5px 20px">
+        <input type="text" placeholder="+ 세부항목 추가..." style="width:100%;border:none;border-bottom:1px dashed var(--border2);font-size:11px;background:transparent;outline:none;font-family:var(--font);color:var(--text2);padding:2px 0"
+          onkeydown="if(event.key==='Enter')addLinkedTask('${ev.id}','${ds}','${ev.projectId||''}',this)">
+      </div></div>`;
+    });
+
+    // 독립 tasks
+    dayTasks.forEach(td=>{
+      const p=proj(td.projectId),c=p.color||'#999';
+      const subs=data.tasks.filter(s=>s.eventId===td.id);
+      html+=`<div class="todo-item" style="border-bottom:1px solid var(--border)">
+        <input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked)">
+        <div style="flex:1;min-width:0">
+          <div class="todo-txt${td.done?' done':''}">${escH(td.title)}</div>
+          ${p.name?`<div style="font-size:10px;color:${c}">${p.name}</div>`:''}
+          ${subs.length>0?`<div style="font-size:10px;color:var(--text3)">${subs.filter(s=>s.done).length}/${subs.length} subtasks</div>`:''}
+        </div>
+        <button class="todo-del" onclick="deleteTask('${td.id}')">✕</button>
+      </div>`;
+    });
+
+    if(dayPevs.length===0&&dayTasks.length===0){
+      html+=`<div style="padding:24px 14px;text-align:center;font-size:12px;color:var(--text3)">No tasks</div>`;
+    }
+
+    // 빠른 추가
+    html+=`</div>
+      <div style="padding:8px;border-top:1px solid var(--border);background:var(--surface)">
+        <div style="display:flex;gap:5px;margin-bottom:5px">
+          <input type="text" id="td-inp-${ds}" placeholder="Add task..."
+            style="flex:1;padding:5px 8px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font)"
+            onkeydown="if(event.key==='Enter')addTodosViewTask('${ds}',this)">
+          <button onclick="addTodosViewTask('${ds}',document.getElementById('td-inp-${ds}'))"
+            style="padding:5px 10px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-xs);cursor:pointer;font-size:14px">+</button>
+        </div>
+        <select id="td-proj-${ds}" style="width:100%;padding:3px 6px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:11px;background:var(--bg);color:var(--text);outline:none">
+          <option value="">No project</option>
+          ${data.projects.map(pr=>`<option value="${pr.id}">${escH(pr.name)}</option>`).join('')}
+        </select>
+      </div>
+    </div>`;
+  });
+
+  html+=`</div>`;
+  document.getElementById('main-content').innerHTML=html;
+}
+
+async function addTodosViewTask(ds,inp){
+  const title=inp.value.trim();if(!title)return;
+  const sel=document.getElementById(`td-proj-${ds}`);
+  const pid=sel?sel.value:'';
+  const td={id:makeId(),title,date:ds,projectId:pid,done:false,eventId:''};
+  data.tasks.push(td);inp.value='';
+  renderTodos();renderAll();
+  await saveTask(td);
+}
+
+// ── Task Calendar ────────────────────────────────────────
+function renderTaskCal(){
+  const yr=state.cursor.getFullYear(),mo=state.cursor.getMonth();
+  const todS=todayStr();
+  const first=new Date(yr,mo,1),last=new Date(yr,mo+1,0);
+  const offset=(first.getDay()||7)-1;
+
+  let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월</span>
+  </div>`;
+
+  html+=`<div class="card month-view" style="margin-bottom:14px"><div class="month-hdr">`;
+  ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach((d,i)=>html+=`<div class="month-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`);
+  html+=`</div><div class="month-grid">`;
+
+  let cells=[];
+  for(let i=0;i<offset;i++){let d=new Date(yr,mo,1-offset+i);cells.push({date:d,other:true});}
+  for(let i=1;i<=last.getDate();i++)cells.push({date:new Date(yr,mo,i),other:false});
+  const rem=7-(cells.length%7);if(rem<7)for(let i=1;i<=rem;i++)cells.push({date:new Date(yr,mo+1,i),other:true});
+
+  cells.forEach(cell=>{
+    const ds=fmtDate(cell.date),isT=ds===todS;
+    const dow=cell.date.getDay(),di=dow===0?6:dow-1;
+    const hol=!cell.other?holName(ds):'';
+    const numColor=hol?'color:var(--red)':di===5?'color:var(--accent)':di===6?'color:var(--red)':'';
+    const dayTasks=!cell.other?data.tasks.filter(t=>t.date===ds&&!t.eventId):[];
+    html+=`<div class="month-cell${cell.other?' other':''}${isT?' today':''}"
+      onclick="${!cell.other?`openAddTaskModal('${ds}')`:''}"
+      oncontextmenu="event.preventDefault()">`;
+    html+=`<div class="month-cell-num" style="${numColor}"><span>${cell.date.getDate()}</span>${hol?`<span style="font-size:9px;color:var(--red);margin-left:3px">${hol}</span>`:''}</div>`;
+    dayTasks.forEach(td=>{
+      const p=proj(td.projectId),c=p.color||'#999';
+      html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)};display:flex;align-items:center;gap:3px" onclick="event.stopPropagation();openEditTaskModal('${td.id}')">
+        ${td.done?'<span style="opacity:.5;text-decoration:line-through">':''}${escH(td.title)}${td.done?'</span>':''}
+      </div>`;
+    });
+    html+=`</div>`;
+  });
+  html+=`</div></div>`;
+
+  // 이달 Task 목록
+  const monthTasks=data.tasks.filter(t=>!t.eventId&&t.date&&t.date.startsWith(`${yr}-${String(mo+1).padStart(2,'0')}`)).sort((a,b)=>a.date.localeCompare(b.date));
+  const doneCnt=monthTasks.filter(t=>t.done).length;
+
+  html+=`<div class="card" style="overflow:hidden">
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between">
+      ${yr}년 ${mo+1}월 Tasks
+      <span style="font-size:11px;color:var(--text3);font-weight:400">${doneCnt}/${monthTasks.length} done</span>
+    </div>`;
+  if(monthTasks.length===0){html+=`<div class="empty">No tasks this month</div>`;}
+  else{
+    // 날짜별 그룹
+    const byDate={};
+    monthTasks.forEach(t=>{if(!byDate[t.date])byDate[t.date]=[];byDate[t.date].push(t);});
+    Object.entries(byDate).sort().forEach(([ds,tds])=>{
+      const d=parseDate(ds);
+      html+=`<div style="padding:5px 14px 2px;font-size:11px;font-weight:600;color:var(--text3);background:var(--surface2)">${d.getMonth()+1}월 ${d.getDate()}일</div>`;
+      tds.forEach(td=>{
+        const p=proj(td.projectId),c=p.color||'#999';
+        const subs=data.tasks.filter(t=>t.eventId===td.id);
+        html+=`<div class="todo-item" style="border-bottom:1px solid var(--border)">
+          <input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked)">
+          <div style="flex:1;min-width:0">
+            <div class="todo-txt${td.done?' done':''}" style="cursor:pointer" onclick="openEditTaskModal('${td.id}')">${escH(td.title)}</div>
+            ${p.name?`<div style="font-size:10px;color:${c}">${p.name}</div>`:''}
+            ${subs.length>0?`<div style="font-size:10px;color:var(--text3);margin-top:1px">${subs.filter(s=>s.done).length}/${subs.length} subtasks</div>`:''}
+          </div>
+          <button class="todo-del" onclick="deleteTask('${td.id}')">✕</button>
+        </div>`;
+      });
+    });
+  }
+  html+=`</div>`;
+  document.getElementById('main-content').innerHTML=html;
+}
+
+function openAddTaskModal(ds){
+  _mMode='add';_mId=null;_mType='task';_mColor='';
+  document.getElementById('modal-title').textContent='Add Task';
+  document.getElementById('m-title').value='';
+  document.getElementById('m-date').value=ds||todayStr();
+  document.getElementById('m-note').value='';
+  document.getElementById('m-del-btn').style.display='none';
+  document.getElementById('m-subtasks-sec').style.display='none';
+  fillProjSelect('');
+  setModalType('task');
+  document.getElementById('modal').style.display='flex';
+  pushUiState('modal');
+  setTimeout(()=>document.getElementById('m-title').focus(),100);
+}
+
+function openEditTaskModal(id){
+  openEditItem('task',id);
+}
+
+// ── Travel ────────────────────────────────────────────────
+let _travelColor=PALETTE[0];
+let _editTravelId=null;
+
+function renderTravel(){
+  const yr=state.cursor.getFullYear(),mo=state.cursor.getMonth();
+  const todS=todayStr();
+
+  // 달력
+  const first=new Date(yr,mo,1),last=new Date(yr,mo+1,0);
+  const offset=(first.getDay()||7)-1;
+
+  let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월</span>
+    <button onclick="openTravelModal()" class="btn-save" style="margin-left:auto;border-radius:20px;font-size:12px;padding:5px 14px">+ Add</button>
+  </div>`;
+
+  html+=`<div class="card month-view" style="margin-bottom:14px"><div class="month-hdr">`;
+  ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach((d,i)=>html+=`<div class="month-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`);
+  html+=`</div><div class="month-grid">`;
+
+  let cells=[];
+  for(let i=0;i<offset;i++){let d=new Date(yr,mo,1-offset+i);cells.push({date:d,other:true});}
+  for(let i=1;i<=last.getDate();i++)cells.push({date:new Date(yr,mo,i),other:false});
+  const rem=7-(cells.length%7);if(rem<7)for(let i=1;i<=rem;i++)cells.push({date:new Date(yr,mo+1,i),other:true});
+
+  cells.forEach(cell=>{
+    const ds=fmtDate(cell.date),isT=ds===todS;
+    const dow=cell.date.getDay(),di=dow===0?6:dow-1;
+    const hol=!cell.other?holName(ds):'';
+    const numColor=hol?'color:var(--red)':di===5?'color:var(--accent)':di===6?'color:var(--red)':'';
+    const travels=!cell.other?data.travels.filter(t=>t.startDate<=ds&&t.endDate>=ds):[];
+    html+=`<div class="month-cell${cell.other?' other':''}${isT?' today':''}"
+      onclick="${!cell.other?`openTravelModalDate('${ds}')`:''}"
+      oncontextmenu="event.preventDefault()">`;
+    html+=`<div class="month-cell-num" style="${numColor}"><span>${cell.date.getDate()}</span>${hol?`<span style="font-size:9px;color:var(--red);margin-left:3px">${hol}</span>`:''}</div>`;
+    travels.forEach(t=>{
+      const isStart=t.startDate===ds,isEnd=t.endDate===ds;
+      html+=`<div class="month-ev" style="background:${evBg(t.color)};color:${evTxt(t.color)};cursor:pointer" onclick="event.stopPropagation();openTravelModal('${t.id}')">
+        ${isStart?'✈️ ':''}${isStart?escH(t.name):''}
+      </div>`;
+    });
+    html+=`</div>`;
+  });
+  html+=`</div></div>`;
+
+  // 이달 여행 목록
+  const monthTravels=data.travels.filter(t=>{
+    const sy=t.startDate.slice(0,7),ey=t.endDate.slice(0,7),cur=`${yr}-${String(mo+1).padStart(2,'0')}`;
+    return sy<=cur&&ey>=cur;
+  }).sort((a,b)=>a.startDate.localeCompare(b.startDate));
+
+  html+=`<div class="card" style="overflow:hidden">
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between">
+      ${yr}년 ${mo+1}월 여행 <span style="font-size:11px;color:var(--text3);font-weight:400">${monthTravels.length}건</span>
+    </div>`;
+
+  if(monthTravels.length===0){
+    html+=`<div class="empty">이달 여행 기록이 없어요 ✈️</div>`;
+  } else {
+    monthTravels.forEach(t=>{
+      const start=parseDate(t.startDate),end=parseDate(t.endDate);
+      const nights=Math.round((end-start)/(1000*60*60*24));
+      const isOpen=window._openTravel===t.id;
+      html+=`<div>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer" onclick="toggleTravelLog('${t.id}')">
+          <div style="width:10px;height:10px;border-radius:50%;background:${t.color};flex-shrink:0"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500">${escH(t.name)}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">
+              ${t.destination?`📍${escH(t.destination)} · `:''}${t.startDate} ~ ${t.endDate} (${nights}박${nights+1}일)
+            </div>
+            ${t.memo?`<div style="font-size:11px;color:var(--text2);margin-top:2px">${escH(t.memo)}</div>`:''}
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <button onclick="event.stopPropagation();openTravelModal('${t.id}')" class="btn-cancel" style="font-size:11px;padding:2px 8px">✎</button>
+            <span style="font-size:12px;color:var(--text3)">${isOpen?'▲':'▼'}</span>
+          </div>
+        </div>`;
+      if(isOpen){
+        // 날짜별 기록
+        const days=[];
+        for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1))days.push(fmtDate(new Date(d)));
+        html+=`<div style="background:var(--surface2);padding:8px 14px;border-bottom:1px solid var(--border)">`;
+        days.forEach(ds=>{
+          const logKey=`travel_${t.id}_${ds}`;
+          const logVal=data.classMemos[logKey]||'';
+          const dd=parseDate(ds);
+          const dow=['일','월','화','수','목','금','토'][dd.getDay()];
+          html+=`<div style="display:flex;align-items:flex-start;gap:10px;padding:5px 0;border-bottom:1px solid var(--border)">
+            <div style="font-size:11px;color:var(--text3);width:70px;flex-shrink:0;padding-top:6px">${dd.getMonth()+1}/${dd.getDate()} (${dow})</div>
+            <input type="text" value="${escH(logVal)}" placeholder="${ds===fmtDate(start)?'출발...':ds===fmtDate(end)?'귀국...':''}"
+              style="flex:1;padding:5px 8px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font)"
+              onblur="saveTravelLog('${t.id}','${ds}',this.value)"
+              onkeydown="if(event.key==='Enter')this.blur()">
+          </div>`;
+        });
+        html+=`</div>`;
+      }
+      html+=`</div>`;
+    });
+  }
+  html+=`</div>`;
+  document.getElementById('main-content').innerHTML=html;
+}
+
+function openTravelModalDate(ds){
+  openTravelModal();
+  document.getElementById('travel-start').value=ds;
+  document.getElementById('travel-end').value=ds;
+}
+
+function openTravelModal(id){
+  console.log('openTravelModal called', id);
+  _editTravelId=id||null;
+  const t=id?data.travels.find(x=>x.id===id):null;
+  document.getElementById('travel-modal-title').textContent=id?'✈️ Edit Travel':'✈️ Add Travel';
+  document.getElementById('travel-modal-id').value=id||'';
+  document.getElementById('travel-name').value=t?t.name:'';
+  document.getElementById('travel-dest').value=t?t.destination||'':'';
+  document.getElementById('travel-start').value=t?t.startDate:fmtDate(state.cursor);
+  document.getElementById('travel-end').value=t?t.endDate:fmtDate(state.cursor);
+  document.getElementById('travel-memo').value=t?t.memo||'':'';
+  document.getElementById('travel-del-btn').style.display=id?'':'none';
+  _travelColor=t?t.color:PALETTE[0];
+  renderTravelColors();
+  document.getElementById('travel-modal').style.display='flex';
+  pushUiState('travel-modal');
+}
+function closeTravelModal(){document.getElementById('travel-modal').style.display='none';}
+function toggleTravelLog(id){
+  window._openTravel=window._openTravel===id?null:id;
+  renderTravel();
+}
+async function saveTravelLog(travelId,ds,val){
+  const key=`travel_${travelId}_${ds}`;
+  data.classMemos[key]=val;
+  await saveClassMemo(`travel_${travelId}_${ds}`,0,val);
+}
+function renderTravelColors(){
+  let h='';
+  PALETTE.forEach(c=>h+=`<div class="color-sw${c===_travelColor?' selected':''}" style="background:${c}" data-c="${c}" onclick="pickTravelColor(this.dataset.c)"></div>`);
+  document.getElementById('travel-colors').innerHTML=h;
+}
+function pickTravelColor(c){_travelColor=c;renderTravelColors();}
+async function saveTravel(){
+  const name=document.getElementById('travel-name').value.trim();
+  const dest=document.getElementById('travel-dest').value.trim();
+  const startDate=document.getElementById('travel-start').value;
+  const endDate=document.getElementById('travel-end').value;
+  const memo=document.getElementById('travel-memo').value.trim();
+  if(!name||!startDate||!endDate){alert('이름, 시작일, 종료일을 입력해주세요.');return;}
+  if(startDate>endDate){alert('종료일이 시작일보다 빠릅니다.');return;}
+  if(_editTravelId){
+    const t=data.travels.find(x=>x.id===_editTravelId);
+    const backup=t?{...t}:null;
+    if(t)Object.assign(t,{name,destination:dest,startDate,endDate,color:_travelColor,memo});
+    closeTravelModal();renderTravel();
+    setSyncing();
+    const{error}=await sb.from('travels').update({name,destination:dest,start_date:startDate,end_date:endDate,color:_travelColor,memo}).eq('id',_editTravelId).eq('user_id',currentUser.id);
+    if(error){
+      // 롤백
+      if(t&&backup)Object.assign(t,backup);
+      renderTravel();setSyncErr('Save Error');alert('Error: '+error.message);
+    }else setSynced();
+  } else {
+    const newT={id:makeId(),name,destination:dest,startDate,endDate,color:_travelColor,memo};
+    data.travels.push(newT);
+    closeTravelModal();renderTravel();
+    setSyncing();
+    const{error}=await sb.from('travels').insert({id:newT.id,user_id:currentUser.id,name,destination:dest,start_date:startDate,end_date:endDate,color:_travelColor,memo});
+    if(error){data.travels=data.travels.filter(t=>t.id!==newT.id);renderTravel();setSyncErr('Save Error');alert('Error: '+error.message);}
+    else setSynced();
+  }
+}
+async function deleteTravel(){
+  if(!_editTravelId)return;
+  const backup=data.travels.find(t=>t.id===_editTravelId);
+  data.travels=data.travels.filter(t=>t.id!==_editTravelId);
+  closeTravelModal();renderTravel();
+  setSyncing();
+  const{error}=await sb.from('travels').delete().eq('id',_editTravelId).eq('user_id',currentUser.id);
+  if(error){if(backup)data.travels.push(backup);renderTravel();setSyncErr('Delete Error');}
+  else setSynced();
+}
+
+
+// ── Event Modal ───────────────────────────────────────────
+let _mMode='add',_mId=null,_mType='timed',_mColor='';
+
+function openAddModal(date){
+  _mMode='add';_mId=null;_mType='timed';_mColor='';
+  document.getElementById('modal-title').textContent='Add';
+  document.getElementById('m-title').value='';
+  document.getElementById('m-date').value=date||state.selected||todayStr();
+  document.getElementById('m-time').value='09:00';
+  document.getElementById('m-note').value='';
+  document.getElementById('m-del-btn').style.display='none';
+  document.getElementById('m-subtasks-sec').style.display='none';
+  setModalType('timed');
+  renderColorSwatches();
+  document.getElementById('modal').style.display='flex';
+  pushUiState('modal');
+  setTimeout(()=>document.getElementById('m-title').focus(),100);
+}
+
+function openEditItem(type,id){
+  _mMode='edit';_mId=id;_mType=type;
+  if(type==='timed'){
+    const te=data.timedEvents.find(t=>t.id===id);if(!te)return;
+    _mColor='';
+    document.getElementById('modal-title').textContent='Edit Timed Event';
+    document.getElementById('m-title').value=te.title;
+    document.getElementById('m-date').value=te.date;
+    document.getElementById('m-time').value=te.time;
+    document.getElementById('m-note').value=data.classMemos[`te_memo_${id}`]||'';
+    document.getElementById('m-del-btn').style.display='';
+    document.getElementById('m-subtasks-sec').style.display='none';
+    fillCatSelect(te.categoryId);
+  } else if(type==='proj'){
+    const ev=data.projEvents.find(e=>e.id===id);if(!ev)return;
+    _mColor=ev.color||'';
+    document.getElementById('modal-title').textContent='Edit Project Event';
+    document.getElementById('m-title').value=ev.title;
+    document.getElementById('m-date').value=ev.date;
+    document.getElementById('m-time').value=ev.start||'09:00';
+    document.getElementById('m-note').value=data.classMemos[`ev_memo_${id}`]||ev.note||'';
+    document.getElementById('m-del-btn').style.display='';
+    document.getElementById('m-subtasks-sec').style.display='';
+    fillProjSelect(ev.projectId);
+    const subs=data.tasks.filter(t=>t.eventId===id);
+    renderSubtasks(subs);
+  } else if(type==='task'){
+    const td=data.tasks.find(t=>t.id===id);if(!td)return;
+    _mColor='';
+    document.getElementById('modal-title').textContent='Edit Task';
+    document.getElementById('m-title').value=td.title;
+    document.getElementById('m-date').value=td.date||todayStr();
+    document.getElementById('m-note').value='';
+    document.getElementById('m-del-btn').style.display='';
+    document.getElementById('m-subtasks-sec').style.display='none';
+    fillProjSelect(td.projectId);
+  }
+  setModalType(type);
+  renderColorSwatches();
+  document.getElementById('modal').style.display='flex';
+  pushUiState('modal');
+}
+
+function setModalType(t){
+  _mType=t;
+  ['timed','proj','task'].forEach(tp=>document.getElementById('tab-'+tp).classList.toggle('active',tp===t));
+  document.getElementById('m-cat-row').style.display=t==='timed'?'':'none';
+  document.getElementById('m-proj-row').style.display=t==='proj'?'':'none';
+  document.getElementById('m-time-row').style.display=(t==='timed'||t==='proj')?'':'none';
+  document.getElementById('m-color-row').style.display=t==='proj'?'':'none';
+  document.getElementById('m-subtasks-sec').style.display=(t==='proj'&&_mMode==='edit')?'':'none';
+  if(t==='timed')fillCatSelect('');
+  else if(t==='proj')fillProjSelect('');
+}
+
+function fillCatSelect(val){
+  const sel=document.getElementById('m-category');
+  sel.innerHTML=data.timedCats.length===0?'<option value="">No categories</option>':data.timedCats.map(c=>`<option value="${c.id}">${c.emoji?c.emoji+' ':''}${escH(c.name)}</option>`).join('');
+  if(val)sel.value=val;
+}
+function fillProjSelect(val){
+  const sel=document.getElementById('m-project');
+  sel.innerHTML='<option value="">No project</option>'+data.projects.map(p=>`<option value="${p.id}">${escH(p.name)}</option>`).join('');
+  if(val)sel.value=val;
+}
+function renderColorSwatches(){
+  let h='';PALETTE.forEach(c=>h+=`<div class="color-sw${c===_mColor?' selected':''}" style="background:${c}" onclick="pickColor('${c}')"></div>`);
+  document.getElementById('color-swatches').innerHTML=h;
+}
+function pickColor(c){_mColor=c;renderColorSwatches();}
+function closeModal(){document.getElementById('modal').style.display='none';}
+
+async function saveItem(){
+  const title=document.getElementById('m-title').value.trim();
+  if(!title){document.getElementById('m-title').focus();return;}
+  const date=document.getElementById('m-date').value;
+  if(_mType==='timed'){
+    const catId=document.getElementById('m-category').value;
+    const time=document.getElementById('m-time').value;
+    const note=document.getElementById('m-note').value;
+    const te={id:_mMode==='add'?makeId():_mId,title,date,time,categoryId:catId};
+    if(note){data.classMemos[`te_memo_${te.id}`]=note;}
+    if(_mMode==='add'){data.timedEvents.push(te);closeModal();renderAll();const err=await saveTimedEvent(te);if(err){data.timedEvents=data.timedEvents.filter(t=>t.id!==te.id);renderAll();alert('Error: '+err);}else if(note)saveClassMemo(te.id+'_te',0,note);}
+    else{const i=data.timedEvents.findIndex(t=>t.id===_mId);const old=data.timedEvents[i];if(i>=0)data.timedEvents[i]=te;closeModal();renderAll();const err=await saveTimedEvent(te);if(err){if(i>=0)data.timedEvents[i]=old;renderAll();alert('Error: '+err);}else if(note)saveClassMemo(te.id+'_te',0,note);}
+  } else if(_mType==='proj'){
+    const pid=document.getElementById('m-project').value;
+    const start=document.getElementById('m-time').value;
+    const note=document.getElementById('m-note').value;
+    const ev={id:_mMode==='add'?makeId():_mId,title,date,start,projectId:pid,color:_mColor,note};
+    if(note){data.classMemos[`ev_memo_${ev.id}`]=note;}// note → 통합일정 메모 연동
+    if(_mMode==='add'){data.projEvents.push(ev);closeModal();renderAll();const err=await saveProjEvent(ev);if(err){data.projEvents=data.projEvents.filter(e=>e.id!==ev.id);renderAll();alert('Error: '+err);}else if(note)saveClassMemo(ev.id,0,note);}
+    else{const i=data.projEvents.findIndex(e=>e.id===_mId);const old=data.projEvents[i];if(i>=0)data.projEvents[i]=ev;data.tasks.forEach(t=>{if(t.eventId===_mId){t.date=date;saveTask(t);}});closeModal();renderAll();const err=await saveProjEvent(ev);if(err){if(i>=0)data.projEvents[i]=old;renderAll();alert('Error: '+err);}else if(note)saveClassMemo(ev.id,0,note);}
+  } else {// task
+    const pid=document.getElementById('m-project').value;
+    const td={id:_mMode==='add'?makeId():_mId,title,date,projectId:pid,done:false,eventId:''};
+    if(_mMode==='add'){data.tasks.push(td);closeModal();renderAll();const err=await saveTask(td);if(err){data.tasks=data.tasks.filter(t=>t.id!==td.id);renderAll();alert('Error: '+err);}}
+    else{const i=data.tasks.findIndex(t=>t.id===_mId);const oldTd=i>=0?{...data.tasks[i]}:null;if(i>=0)data.tasks[i]=td;closeModal();renderAll();const err=await saveTask(td);if(err){if(i>=0&&oldTd)data.tasks[i]=oldTd;renderAll();alert('Error: '+err);}}
+  }
+}
+
+async function deleteItem(){
+  if(!_mId)return;
+  if(_mType==='timed'){
+    const backup=data.timedEvents.find(t=>t.id===_mId);
+    data.timedEvents=data.timedEvents.filter(t=>t.id!==_mId);closeModal();renderAll();
+    await delTimedEvent(_mId,backup);
+  } else if(_mType==='proj'){
+    const backup=data.projEvents.find(e=>e.id===_mId);
+    const subBackup=data.tasks.filter(t=>t.eventId===_mId);
+    data.tasks=data.tasks.filter(t=>t.eventId!==_mId);
+    data.projEvents=data.projEvents.filter(e=>e.id!==_mId);closeModal();renderAll();
+    await delProjEvent(_mId,backup,subBackup);
+  } else {
+    const backup=data.tasks.find(t=>t.id===_mId);
+    data.tasks=data.tasks.filter(t=>t.id!==_mId);closeModal();renderAll();
+    const{error}=await sb.from('todos').delete().eq('id',_mId).eq('user_id',currentUser.id);
+    if(error){if(backup)data.tasks.push(backup);renderAll();alert('Delete failed');}
+  }
+}
+
+function renderSubtasks(subs){
+  const h=subs.map(td=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0"><input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked)"><span style="flex:1;font-size:13px${td.done?';text-decoration:line-through;color:var(--text3)':''}">${escH(td.title)}</span><button onclick="deleteTask('${td.id}')" class="todo-del">✕</button></div>`).join('');
+  document.getElementById('m-subtasks-list').innerHTML=h||`<div style="font-size:12px;color:var(--text3)">No subtasks</div>`;
+}
+async function addSubtask(){
+  if(!_mId)return;
+  const inp=document.getElementById('m-sub-inp');
+  const title=inp.value.trim();if(!title)return;
+  const ev=data.projEvents.find(e=>e.id===_mId);
+  const td={id:makeId(),title,date:ev?.date||todayStr(),projectId:ev?.projectId||'',done:false,eventId:_mId};
+  data.tasks.push(td);inp.value='';
+  renderSubtasks(data.tasks.filter(t=>t.eventId===_mId));
+  renderAll();await saveTask(td);
+}
+
+// ── Tasks ─────────────────────────────────────────────────
+async function toggleTask(id,checked){
+  const td=data.tasks.find(t=>t.id===id);if(!td)return;
+  const prev=td.done;
+  td.done=checked;renderAll();
+  if(document.getElementById('todo-panel').style.display!=='none')renderTodoPanel();
+  const err=await saveTask(td);
+  if(err){td.done=prev;renderAll();alert('Save error: '+err);}
+}
+async function deleteTask(id){
+  const removed=data.tasks.filter(t=>t.id===id);
+  data.tasks=data.tasks.filter(t=>t.id!==id);renderAll();
+  if(document.getElementById('todo-panel').style.display!=='none')renderTodoPanel();
+  setSyncing();
+  const{error}=await sb.from('todos').delete().eq('id',id).eq('user_id',currentUser.id);
+  if(error){data.tasks.push(...removed);renderAll();setSyncErr('Delete Error');alert('Delete failed');}
+  else setSynced();
+}
+async function addLinkedTask(evId,date,pid,inp){
+  const title=inp.value.trim();if(!title)return;
+  const td={id:makeId(),title,date,projectId:pid,done:false,eventId:evId};
+  data.tasks.push(td);inp.value='';renderAll();await saveTask(td);
+}
+async function addDayTask(ds){
+  const inp=document.getElementById('day-task-inp');
+  const title=inp.value.trim();if(!title)return;
+  const td={id:makeId(),title,date:ds,projectId:state.projFilter||'',done:false,eventId:''};
+  data.tasks.push(td);inp.value='';renderAll();await saveTask(td);
+}
+
+// Todo Panel
+let _hideDone=false;
+function updateTpProj(){/* deprecated */}
+function todoPanelNav(dir){
+  const d=parseDate(state.todoPanelDate);
+  d.setDate(d.getDate()+dir);
+  state.todoPanelDate=fmtDate(d);
+  renderTodoPanel();
+}
+function todoPanelToday(){
+  state.todoPanelDate=todayStr();
+  renderTodoPanel();
+}
+function toggleTodos(){
+  // 이제 뷰로 전환
+  setView('todos');
+}
+function closeTodoPanel(){document.getElementById('todo-panel').style.display='none';}
+function toggleHideDone(){
+  _hideDone=!_hideDone;
+  const label=_hideDone?'Show Done':'Hide Done';
+  const btn1=document.getElementById('hide-done-btn');
+  const btn2=document.getElementById('hide-done-btn2');
+  if(btn1)btn1.textContent=label;
+  if(btn2)btn2.textContent=label;
+  if(state.view==='todos')renderTodos();
+  else renderTodoPanel();
+}
+function renderTodoPanel(){
+  const baseDate=parseDate(state.todoPanelDate);
+  // 3일치 날짜 생성
+  const days=[-1,0,1].map(i=>{
+    const d=new Date(baseDate);d.setDate(d.getDate()+i);return fmtDate(d);
+  });
+
+  const todS=todayStr();
+  let html='';
+
+  days.forEach((ds,di)=>{
+    const d=parseDate(ds);
+    const isToday=ds===todS;
+    const dow=['일','월','화','수','목','금','토'][d.getDay()];
+    const dayLabel=`${d.getMonth()+1}월 ${d.getDate()}일 (${dow})`;
+
+    // 이날의 독립 tasks
+    const dayTasks=data.tasks.filter(t=>t.date===ds&&!t.eventId&&(!_hideDone||!t.done));
+    // 이날의 proj events와 세부항목
+    const dayPevs=data.projEvents.filter(e=>e.date===ds);
+    const daySubsByEv={};
+    dayPevs.forEach(ev=>{
+      const subs=data.tasks.filter(t=>t.eventId===ev.id&&(!_hideDone||!t.done));
+      if(subs.length>0||!_hideDone)daySubsByEv[ev.id]=subs;
+    });
+
+    const borderL=di>0?'border-left:1px solid var(--border);':'';
+    const bgCol=isToday?'background:rgba(45,107,228,0.03);':'';
+
+    html+=`<div style="flex:1;min-width:0;display:flex;flex-direction:column;${borderL}${bgCol}">
+      <!-- 날짜 헤더 -->
+      <div style="padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;gap:6px;background:${isToday?'var(--accent-bg)':'var(--surface2)'}">
+        <span style="font-size:12px;font-weight:600;color:${isToday?'var(--accent)':'var(--text2)'}">${dayLabel}</span>
+        ${isToday?'<span style="font-size:10px;background:var(--accent);color:#fff;padding:1px 6px;border-radius:8px">오늘</span>':''}
+        <button onclick="openAddTaskModal('${ds}')" style="margin-left:auto;background:none;border:1px solid var(--border2);border-radius:var(--radius-xs);padding:1px 7px;cursor:pointer;font-size:14px;color:var(--text3)">+</button>
+      </div>
+      <!-- 태스크 목록 -->
+      <div style="flex:1;overflow-y:auto;padding:6px 0">`;
+
+    // proj event 세부항목
+    dayPevs.forEach(ev=>{
+      const subs=daySubsByEv[ev.id];
+      if(subs===undefined)return;
+      const p=proj(ev.projectId),c=p.color||'#4472C4';
+      html+=`<div style="margin:4px 8px;border-radius:var(--radius-xs);background:${evBg(c)};overflow:hidden">
+        <div style="padding:5px 8px;font-size:11px;font-weight:600;color:${evTxt(c)};cursor:pointer;display:flex;align-items:center;gap:5px" onclick="openEditItem('proj','${ev.id}')">
+          <span style="width:5px;height:5px;border-radius:50%;background:${c};display:inline-block;flex-shrink:0"></span>
+          ${escH(ev.title)}
+        </div>`;
+      subs.forEach(td=>{
+        html+=`<div style="display:flex;align-items:center;gap:6px;padding:3px 8px 3px 16px;background:var(--surface);border-top:1px solid ${evBg(c)}">
+          <input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked);renderTodoPanel()">
+          <span style="flex:1;font-size:12px;${td.done?'text-decoration:line-through;color:var(--text3)':''}">${escH(td.title)}</span>
+          <button class="todo-del" onclick="deleteTask('${td.id}');renderTodoPanel()">✕</button>
+        </div>`;
+      });
+      html+=`<div style="padding:3px 8px 5px 16px;background:var(--surface)">
+        <input type="text" placeholder="+ 세부항목..." style="width:100%;border:none;background:transparent;font-size:11px;color:var(--text2);outline:none;font-family:var(--font)"
+          onkeydown="if(event.key==='Enter')addLinkedTask('${ev.id}','${ds}','${ev.projectId||''}',this);if(event.key==='Enter')renderTodoPanel()">
+      </div></div>`;
+    });
+
+    // 독립 tasks
+    if(dayTasks.length>0){
+      html+=`<div style="margin:4px 8px;border-radius:var(--radius-xs);overflow:hidden;border:1px solid var(--border)">`;
+      dayTasks.forEach(td=>{
+        const p=proj(td.projectId),c=p.color||'#999';
+        const subs=data.tasks.filter(s=>s.eventId===td.id);
+        html+=`<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--border);background:var(--surface)">
+          <input type="checkbox" class="todo-cb" ${td.done?'checked':''} onchange="toggleTask('${td.id}',this.checked);renderTodoPanel()">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;${td.done?'text-decoration:line-through;color:var(--text3)':''}">${escH(td.title)}</div>
+            ${p.name?`<div style="font-size:10px;color:${c}">${p.name}</div>`:''}
+            ${subs.length>0?`<div style="font-size:10px;color:var(--text3)">${subs.filter(s=>s.done).length}/${subs.length} done</div>`:''}
+          </div>
+          <button class="todo-del" onclick="deleteTask('${td.id}');renderTodoPanel()">✕</button>
+        </div>`;
+      });
+      html+=`</div>`;
+    }
+
+    if(dayTasks.length===0&&dayPevs.length===0){
+      html+=`<div style="padding:20px 12px;text-align:center;font-size:12px;color:var(--text3)">No tasks</div>`;
+    }
+
+    // 빠른 추가
+    html+=`</div>
+      <div style="padding:8px;border-top:1px solid var(--border);flex-shrink:0">
+        <div style="display:flex;gap:5px;margin-bottom:5px">
+          <input type="text" placeholder="Add task..." id="tp-inp-${ds}"
+            style="flex:1;padding:5px 8px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font)"
+            onkeydown="if(event.key==='Enter')addDayTodoPanel('${ds}',this)">
+          <button onclick="addDayTodoPanel('${ds}',document.getElementById('tp-inp-${ds}'))"
+            style="padding:5px 10px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-xs);cursor:pointer;font-size:14px">+</button>
+        </div>
+        <select id="tp-proj-${ds}" style="width:100%;padding:3px 6px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:11px;background:var(--bg);color:var(--text);outline:none">
+          <option value="">No project</option>
+          ${data.projects.map(pr=>`<option value="${pr.id}">${escH(pr.name)}</option>`).join('')}
+        </select>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('todo-panel-body').innerHTML=html;
+}
+
+async function addDayTodoPanel(ds,inp){
+  const title=inp.value.trim();if(!title)return;
+  const sel=document.getElementById(`tp-proj-${ds}`);
+  const pid=sel?sel.value:'';
+  const td={id:makeId(),title,date:ds,projectId:pid,done:false,eventId:''};
+  data.tasks.push(td);
+  inp.value='';
+  renderTodoPanel();renderAll();
+  await saveTask(td);
+}
+
+
+async function changeSubDate(id,newDate){
+  const td=data.tasks.find(t=>t.id===id);if(!td)return;
+  const old=td.date;
+  td.date=newDate;
+  renderTodoPanel();
+  const err=await saveTask(td);
+  if(err){td.date=old;renderTodoPanel();}
+}
+async function addPanelTodo(){/* replaced by addDayTodoPanel */}
+
+// ── Projects ──────────────────────────────────────────────
+let _newProjColor=PALETTE[0];
+function openProjModal(){renderProjEdit();document.getElementById('proj-modal').style.display='flex';pushUiState('proj-modal');}
+function closeProjModal(){document.getElementById('proj-modal').style.display='none';}
+function renderProjEdit(){
+  const projs=orderedProjects();
+  let h='';
+  projs.forEach((p,i)=>{
+    h+=`<div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--border)">
+      <span style="width:10px;height:10px;border-radius:50%;background:${p.color};flex-shrink:0"></span>
+      <input type="text" value="${escH(p.name)}" style="flex:1;padding:4px 7px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:13px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font)" onblur="renameProj('${p.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+      <button onclick="moveProjUp('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px;padding:2px 4px" ${i===0?'disabled opacity:.3':''}>▲</button>
+      <button onclick="moveProjDown('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:12px;padding:2px 4px" ${i===projs.length-1?'disabled opacity:.3':''}>▼</button>
+      <button onclick="deleteProj('${p.id}')" class="todo-del" style="font-size:12px">✕</button>
+    </div>`;
+  });
+  document.getElementById('proj-list-edit').innerHTML=h||`<div style="font-size:12px;color:var(--text3);padding:8px 0">No projects</div>`;
+  // Colors
+  let ch='';PALETTE.forEach(c=>ch+=`<div class="color-sw${c===_newProjColor?' selected':''}" style="background:${c}" onclick="_newProjColor='${c}';renderProjEdit()"></div>`);
+  document.getElementById('new-proj-colors').innerHTML=ch;
+}
+async function renameProj(id,name){
+  const p=data.projects.find(x=>x.id===id);if(!p||p.name===name)return;
+  p.name=name;renderSidebar();await saveProj(p);
+}
+function moveProjUp(id){
+  const order=orderedProjects().map(p=>p.id);
+  const i=order.indexOf(id);if(i<=0)return;
+  [order[i-1],order[i]]=[order[i],order[i-1]];
+  data.projOrder=order;renderProjEdit();renderSidebar();
+}
+function moveProjDown(id){
+  const order=orderedProjects().map(p=>p.id);
+  const i=order.indexOf(id);if(i>=order.length-1)return;
+  [order[i],order[i+1]]=[order[i+1],order[i]];
+  data.projOrder=order;renderProjEdit();renderSidebar();
+}
+async function addProject(){
+  const emoji=document.getElementById('new-proj-emoji').value.trim();
+  const name=document.getElementById('new-proj-name').value.trim();
+  if(!name)return;
+  const fullName=emoji?emoji+' '+name:name;
+  const p={id:makeId(),name:fullName,color:_newProjColor};
+  data.projects.push(p);
+  document.getElementById('new-proj-name').value='';document.getElementById('new-proj-emoji').value='';
+  renderProjEdit();renderSidebar();renderAll();await saveProj(p);
+}
+async function deleteProj(id){
+  if(!confirm('Delete this project?'))return;
+  data.projEvents.forEach(e=>{if(e.projectId===id)e.projectId='';});
+  data.projects=data.projects.filter(p=>p.id!==id);
+  if(state.projFilter===id)state.projFilter=null;
+  data.projOrder=data.projOrder.filter(x=>x!==id);
+  renderProjEdit();renderSidebar();renderAll();await delProj(id);
+}
+
+// ── Anniversaries ─────────────────────────────────────────
+function openAnnivModal(){renderAnnivList();document.getElementById('anniv-modal').style.display='flex';pushUiState('anniv-modal');}
+function closeAnnivModal(){document.getElementById('anniv-modal').style.display='none';}
+function openAddAnniv(){document.getElementById('anniv-add-form').style.display='';document.getElementById('anniv-name').focus();}
+function closeAddAnniv(){document.getElementById('anniv-add-form').style.display='none';}
+function renderAnnivList(){
+  let h='';
+  if(data.anniversaries.length===0){h=`<div class="empty">No anniversaries</div>`;}
+  else data.anniversaries.forEach(a=>{
+    const ds=a.repeatYearly?`${a.month}월 ${a.day}일 (매년)`:`${a.year||''}년 ${a.month}월 ${a.day}일`;
+    h+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:16px">${a.emoji||'🎉'}</span>
+      <div style="flex:1"><div style="font-size:13px;font-weight:500">${escH(a.name)}</div><div style="font-size:11px;color:var(--text3)">${ds}</div></div>
+      <button onclick="deleteAnniv('${a.id}')" class="todo-del" style="font-size:12px">✕</button>
+    </div>`;
+  });
+  document.getElementById('anniv-list').innerHTML=h;
+}
+async function saveAnniv(){
+  if(!currentUser)return;
+  const emoji=document.getElementById('anniv-emoji').value.trim()||'🎉';
+  const name=document.getElementById('anniv-name').value.trim();
+  const month=parseInt(document.getElementById('anniv-month').value);
+  const day=parseInt(document.getElementById('anniv-day').value);
+  const year=parseInt(document.getElementById('anniv-year').value)||null;
+  const repeatYearly=document.getElementById('anniv-repeat').checked;
+  if(!name||!month||!day){alert('이름, 월, 일을 입력해주세요.');return;}
+  const a={id:makeId(),name,emoji,month,day,year,repeatYearly};
+  data.anniversaries.push(a);
+  closeAddAnniv();renderAnnivList();renderAll();
+  ['anniv-name','anniv-emoji','anniv-month','anniv-day','anniv-year'].forEach(id=>document.getElementById(id).value='');
+  const{error}=await sb.from('anniversaries').insert({id:a.id,user_id:currentUser.id,name,emoji,month,day,year:year||null,repeat_yearly:repeatYearly});
+  if(error)alert('Error: '+error.message);
+}
+async function deleteAnniv(id){
+  data.anniversaries=data.anniversaries.filter(a=>a.id!==id);
+  renderAnnivList();renderAll();
+  await sb.from('anniversaries').delete().eq('id',id).eq('user_id',currentUser.id);
+}
+
+// ── Timed Categories ──────────────────────────────────────
+let _tcColor=PALETTE[0];
+function openTimedCatModal(){renderTcList();renderTcColors();document.getElementById('timed-cat-modal').style.display='flex';pushUiState('timed-cat-modal');}
+function closeTimedCatModal(){document.getElementById('timed-cat-modal').style.display='none';}
+function renderTcColors(){let h='';PALETTE.forEach(c=>h+=`<div class="color-sw${c===_tcColor?' selected':''}" style="background:${c}" onclick="_tcColor='${c}';renderTcColors()"></div>`);document.getElementById('tc-colors').innerHTML=h;}
+function renderTcList(){
+  let h='';
+  if(data.timedCats.length===0){h=`<div class="empty">No categories</div>`;}
+  else data.timedCats.forEach((c,i)=>{
+    const cnt=data.timedEvents.filter(t=>t.categoryId===c.id).length;
+    h+=`<div style="padding:6px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+        <input type="text" value="${c.emoji||''}" maxlength="2" style="width:30px;padding:2px 3px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:14px;text-align:center;background:var(--bg);outline:none"
+          onblur="updateTimedCatEmoji('${c.id}',this.value)">
+        <input type="text" value="${escH(c.name)}" style="flex:1;padding:3px 7px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font)"
+          onblur="renameTimedCat('${c.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()">
+        <span style="font-size:10px;color:var(--text3)">${cnt}</span>
+        <button onclick="moveTimedCatUp('${c.id}')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:11px" ${i===0?'disabled':''}>▲</button>
+        <button onclick="moveTimedCatDown('${c.id}')" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:11px" ${i===data.timedCats.length-1?'disabled':''}>▼</button>
+        <button onclick="deleteTimedCat('${c.id}')" class="todo-del" style="font-size:11px">✕</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">
+        ${PALETTE.map(pc=>`<div class="color-sw${pc===c.color?' selected':''}" style="width:16px;height:16px;background:${pc};border-radius:50%;cursor:pointer;border:2px solid ${pc===c.color?'var(--text)':'transparent'}" onclick="updateTimedCatColor('${c.id}','${pc}')"></div>`).join('')}
+      </div>
+    </div>`;
+  });
+  document.getElementById('tc-list').innerHTML=h;
+}
+async function updateTimedCatColor(id,color){
+  const c=data.timedCats.find(x=>x.id===id);if(!c||c.color===color)return;
+  c.color=color;renderTcList();renderSidebar();renderAll();
+  await sb.from('timed_categories').update({color}).eq('id',id).eq('user_id',currentUser.id);
+}
+async function updateTimedCatEmoji(id,emoji){
+  const c=data.timedCats.find(x=>x.id===id);if(!c)return;
+  c.emoji=emoji;renderTcList();renderSidebar();
+  await sb.from('timed_categories').update({emoji}).eq('id',id).eq('user_id',currentUser.id);
+}
+async function renameTimedCat(id,name){
+  const c=data.timedCats.find(x=>x.id===id);if(!c||c.name===name)return;
+  c.name=name;renderSidebar();
+  await sb.from('timed_categories').update({name}).eq('id',id).eq('user_id',currentUser.id);
+}
+function moveTimedCatUp(id){
+  const i=data.timedCats.findIndex(c=>c.id===id);if(i<=0)return;
+  [data.timedCats[i-1],data.timedCats[i]]=[data.timedCats[i],data.timedCats[i-1]];
+  renderTcList();renderSidebar();
+}
+function moveTimedCatDown(id){
+  const i=data.timedCats.findIndex(c=>c.id===id);if(i>=data.timedCats.length-1)return;
+  [data.timedCats[i],data.timedCats[i+1]]=[data.timedCats[i+1],data.timedCats[i]];
+  renderTcList();renderSidebar();
+}
+async function addTimedCat(){
+  if(!currentUser)return;
+  const emoji=document.getElementById('tc-emoji').value.trim();
+  const name=document.getElementById('tc-name').value.trim();
+  if(!name){alert('이름을 입력해주세요.');return;}
+  const c={id:makeId(),name,color:_tcColor,emoji};
+  data.timedCats.push(c);renderTcList();renderAll();
+  document.getElementById('tc-name').value='';document.getElementById('tc-emoji').value='';
+  await sb.from('timed_categories').insert({id:c.id,user_id:currentUser.id,name,color:_tcColor,emoji});
+}
+async function deleteTimedCat(id){
+  data.timedCats=data.timedCats.filter(c=>c.id!==id);renderTcList();renderAll();
+  await sb.from('timed_categories').delete().eq('id',id).eq('user_id',currentUser.id);
+}
+
+// ── Cell Color ────────────────────────────────────────────
+function openCellColorPicker(ds,evt){
+  document.getElementById('cell-color-picker-el')?.remove();
+  const cur=data.cellColors[ds]||'';
+  const curEmoji=data.cellEmojis[ds]||'';
+  let h=`<div id="cell-color-picker-el" class="cell-color-picker" onclick="event.stopPropagation()" style="width:190px">
+    <div style="font-size:10px;color:var(--text3);margin-bottom:5px;font-weight:600">이모지</div>
+    <div style="display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap">
+      ${['☀️','🌙','🌧','❄️','🌸','🏠','🏖','🚗','✈️','🎉','📝','💊','💪','😴','❤️','⭐'].map(e=>`<span style="cursor:pointer;font-size:16px;padding:2px;border-radius:4px;${e===curEmoji?'background:var(--accent-bg)':''}" onclick="setCellEmoji('${ds}','${e==='${curEmoji}'?'':e}')">${e}</span>`).join('')}
+      <input type="text" value="${curEmoji}" maxlength="2" placeholder="✏️" 
+        style="width:32px;padding:2px;border:1px solid var(--border2);border-radius:4px;font-size:14px;text-align:center;background:var(--bg);outline:none"
+        oninput="setCellEmoji('${ds}',this.value)" onclick="event.stopPropagation()">
+      <button onclick="setCellEmoji('${ds}','')" style="font-size:10px;color:var(--text3);background:none;border:none;cursor:pointer">✕</button>
+    </div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:5px;font-weight:600">Cell Color</div>
+    <div class="color-row" style="margin-bottom:6px">`;
+  PALETTE.forEach(c=>h+=`<div class="color-sw${c===cur?' selected':''}" style="background:${c}" onclick="setCellColor('${ds}','${c}')"></div>`);
+  h+=`</div><button onclick="setCellColor('${ds}','')" class="btn-cancel" style="width:100%;font-size:11px;padding:3px">Color Clear</button></div>`;
+  document.body.insertAdjacentHTML('beforeend',h);
+  const el=document.getElementById('cell-color-picker-el');
+  el.style.left=Math.min(evt.pageX,window.innerWidth-200)+'px';
+  el.style.top=Math.min(evt.pageY,window.innerHeight-320)+'px';
+  setTimeout(()=>document.addEventListener('click',closeCellColorPicker,{once:true}),10);
+}
+async function setCellEmoji(ds,emoji){
+  if(emoji)data.cellEmojis[ds]=emoji;else delete data.cellEmojis[ds];
+  renderAll();
+  // cell_colors 테이블에 emoji도 저장 (color field에 JSON으로)
+  try{
+    if(emoji){await sb.from('cell_colors').upsert({user_id:currentUser.id,date:'emoji_'+ds,color:emoji});}
+    else{await sb.from('cell_colors').delete().eq('date','emoji_'+ds).eq('user_id',currentUser.id);}
+  }catch(e){}
+}
+async function setCellColor(ds,color){
+  if(color)data.cellColors[ds]=color;else delete data.cellColors[ds];
+  document.getElementById('cell-color-picker-el')?.remove();
+  renderAll();await saveCellColor(ds,color);
+}
+function closeCellColorPicker(){document.getElementById('cell-color-picker-el')?.remove();}
+
+// ── School Schedule ───────────────────────────────────────
+async function addSchoolSchedule(){
+  if(!currentUser){alert('Login required.');return;}
+  const classes=[{name:'패션디자인연구(4)',color:'#4472C4',day:2,start:'14:00'},{name:'회화론',color:'#70AD47',day:2,start:'18:00'},{name:'디자인미학',color:'#7030A0',day:4,start:'10:00'}];
+  const titles=classes.map(c=>c.name);
+  const existing=data.projEvents.filter(e=>titles.includes(e.title));
+  if(existing.length>0){if(!confirm(`기존 수업 일정 ${existing.length}개를 삭제하고 새로 추가할까요?`))return;
+    const ids=existing.map(e=>e.id);data.projEvents=data.projEvents.filter(e=>!ids.includes(e.id));await sb.from('events').delete().in('id',ids).eq('user_id',currentUser.id);
+    const ep=data.projects.filter(p=>titles.includes(p.name));const epIds=ep.map(p=>p.id);data.projects=data.projects.filter(p=>!epIds.includes(p.id));if(epIds.length>0)await sb.from('projects').delete().in('id',epIds).eq('user_id',currentUser.id);}
+  setSyncing();
+  const pRows=[];
+  for(const cp of classes){cp.id=makeId();data.projects.push({id:cp.id,name:cp.name,color:cp.color});pRows.push({id:cp.id,user_id:currentUser.id,name:cp.name,color:cp.color});}
+  await sb.from('projects').insert(pRows);
+  let start=new Date(2026,2,1);while(start.getDay()!==2)start.setDate(start.getDate()+1);
+  const evs=[];
+  for(let w=0;w<15;w++)for(const cp of classes){const d=new Date(start);d.setDate(d.getDate()+w*7+(cp.day-2));evs.push({id:makeId(),title:cp.name,date:fmtDate(d),start:cp.start,projectId:cp.id,color:'',note:''});}
+  data.projEvents.push(...evs);renderAll();
+  const{error}=await sb.from('events').insert(evs.map(ev=>({id:ev.id,user_id:currentUser.id,title:ev.title,date:ev.date,start:ev.start,end:null,project_id:ev.projectId,color:null,note:null})));
+  if(error){setSyncErr('Error');alert(error.message);}else{setSynced();alert(`✓ 완료! 프로젝트 3개 + 일정 ${evs.length}개`);}
+}
+
+// ── Backup ────────────────────────────────────────────────
+async function importData(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=async function(ev){
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(!d.projects&&!d.projEvents)throw new Error('Invalid backup file');
+      if(!confirm(`Restore backup?\n• ${(d.projects||[]).length} projects\n• ${(d.projEvents||[]).length} events\n• ${(d.tasks||[]).length} tasks\n\nThis will replace all current data.`))return;
+      setSyncing();
+      const uid=currentUser.id;
+      await Promise.all([
+        sb.from('events').delete().eq('user_id',uid),
+        sb.from('todos').delete().eq('user_id',uid),
+        sb.from('projects').delete().eq('user_id',uid),
+        sb.from('timed_events').delete().eq('user_id',uid),
+        sb.from('timed_categories').delete().eq('user_id',uid),
+        sb.from('anniversaries').delete().eq('user_id',uid),
+        sb.from('period_logs').delete().eq('user_id',uid),
+        sb.from('golf').delete().eq('user_id',uid),
+        sb.from('office').delete().eq('user_id',uid),
+        sb.from('cell_colors').delete().eq('user_id',uid),
+        sb.from('travels').delete().eq('user_id',uid),
+        sb.from('class_memos').delete().eq('user_id',uid),
+        sb.from('home_notes').delete().eq('user_id',uid),
+      ]);
+      if((d.projects||[]).length)await sb.from('projects').insert(d.projects.map(p=>({id:p.id,user_id:uid,name:p.name,color:p.color})));
+      if((d.projEvents||[]).length)await sb.from('events').insert(d.projEvents.map(ev=>({id:ev.id,user_id:uid,title:ev.title,date:ev.date,start:ev.start||null,end:null,project_id:ev.projectId||null,color:ev.color||null,note:ev.note||null})));
+      if((d.tasks||[]).length)await sb.from('todos').insert(d.tasks.map(td=>({id:td.id,user_id:uid,title:td.title,date:td.date||null,project_id:td.projectId||null,done:td.done,event_id:td.eventId||null})));
+      if((d.timedCats||[]).length)await sb.from('timed_categories').insert(d.timedCats.map(c=>({id:c.id,user_id:uid,name:c.name,color:c.color,emoji:c.emoji||''})));
+      if((d.timedEvents||[]).length)await sb.from('timed_events').insert(d.timedEvents.map(t=>({id:t.id,user_id:uid,title:t.title,date:t.date,time:t.time,category_id:t.categoryId||null})));
+      if((d.anniversaries||[]).length)await sb.from('anniversaries').insert(d.anniversaries.map(a=>({id:a.id,user_id:uid,name:a.name,emoji:a.emoji,month:a.month,day:a.day,year:a.year||null,repeat_yearly:a.repeatYearly})));
+      if((d.periodLogs||[]).length)await sb.from('period_logs').insert(d.periodLogs.map(p=>({id:p.id,user_id:uid,start_date:p.startDate})));
+      for(const[ds,rec]of Object.entries(d.golf||{}))await saveGolfRec(ds,rec);
+      for(const[ds,rec]of Object.entries(d.office||{}))await saveOfficeRec(ds,rec);
+      for(const[ds,c]of Object.entries(d.cellColors||{}))await saveCellColor(ds,c);
+      // cellEmojis - cell_colors 테이블에 emoji_ prefix로
+      for(const[ds,emoji]of Object.entries(d.cellEmojis||{}))
+        await sb.from('cell_colors').upsert({user_id:uid,date:'emoji_'+ds,color:emoji});
+      if(d.homeNote)await saveHomeNote(d.homeNote);
+      // travels 복원
+      if((d.travels||[]).length){
+        await sb.from('travels').insert(d.travels.map(t=>({id:t.id,user_id:uid,name:t.name,destination:t.destination||'',start_date:t.startDate,end_date:t.endDate,color:t.color||'#4472C4',memo:t.memo||''})));
+      }
+      // classMemos + haegobjMemos 복원
+      const allMemos=[];
+      Object.entries(d.classMemos||{}).forEach(([k,v])=>{
+        // ev_memo_xxx → project_id=xxx, week=0
+        if(k.startsWith('ev_memo_'))allMemos.push({user_id:uid,project_id:k.slice(8),week:0,content:v});
+        else if(k.startsWith('te_memo_'))allMemos.push({user_id:uid,project_id:'te_'+k.slice(8),week:0,content:v});
+        else if(k.startsWith('travel_'))allMemos.push({user_id:uid,project_id:k,week:0,content:v});
+        else{const parts=k.split('_');const week=parseInt(parts[parts.length-1]);if(!isNaN(week))allMemos.push({user_id:uid,project_id:parts.slice(0,-1).join('_'),week,content:v});}
+      });
+      Object.entries(d.haegobjMemos||{}).forEach(([ds,v])=>{
+        allMemos.push({user_id:uid,project_id:'haegobj_'+ds,week:0,content:v});
+      });
+      if(allMemos.length){
+        // 50개씩 나눠서 insert (이미 위에서 삭제함)
+        for(let i=0;i<allMemos.length;i+=50)
+          await sb.from('class_memos').insert(allMemos.slice(i,i+50));
+      }
+      await loadAll();
+      document.getElementById('backup-status').textContent='Restored ✓';
+      setTimeout(()=>document.getElementById('backup-status').textContent='',3000);
+    }catch(err){setSyncErr('Restore failed');alert(err.message);}
+    e.target.value='';
+  };
+  reader.readAsText(file);
+}
+function exportData(){
+  const obj={projects:data.projects,timedCats:data.timedCats,timedEvents:data.timedEvents,projEvents:data.projEvents,tasks:data.tasks,golf:data.golf,office:data.office,cellColors:data.cellColors,cellEmojis:data.cellEmojis||{},anniversaries:data.anniversaries,periodLogs:data.periodLogs,travels:data.travels,homeNote:data.homeNote,classMemos:data.classMemos,haegobjMemos:data.haegobjMemos||{},projOrder:data.projOrder,exportedAt:new Date().toISOString()};
+  const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='jinhae_schedule_'+new Date().toISOString().slice(0,10)+'.json';a.click();URL.revokeObjectURL(a.href);
+}
+
+// ── History & Mobile ──────────────────────────────────────
+// 탭 복귀시 동기화 상태 리셋
+let _reloadInProgress=false;
+async function reloadOnResume(){
+  if(!currentUser||_reloadInProgress)return;
+  _reloadInProgress=true;
+  try{
+    setSyncing();
+    let session;
+    try{
+      const r=await sb.auth.refreshSession();
+      session=r.data?.session;
+    }catch(e){
+      const r2=await sb.auth.getSession();
+      session=r2.data?.session;
+    }
+    if(!session?.user){
+      document.getElementById('app').style.display='none';
+      document.getElementById('login-screen').style.display='flex';
+      return;
+    }
+    currentUser=session.user;
+    await loadAll();
+  }catch(e){
+    console.error('resume reload failed:',e);
+    setSyncErr('Sync failed');
+  }finally{
+    _reloadInProgress=false;
+  }
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'){
+    reloadOnResume();
+  }
+});
+window.addEventListener('pageshow',(e)=>{
+  // bfcache(뒤로가기 캐시)에서 복원될 때도 재동기화
+  if(e.persisted||document.visibilityState==='visible'){
+    reloadOnResume();
+  }
+});
+
+function setupHistory(){
+  if(!history.state||!history.state.app){
+    history.replaceState({app:true},'',window.location.href);
+  }
+}
+function pushUiState(type){
+  history.pushState({app:true,ui:type},'',window.location.href);
+}
+window.addEventListener('popstate',()=>{
+  const modals=['modal','todo-panel','proj-modal','anniv-modal','timed-cat-modal','golf-modal','studio-modal','travel-modal'];
+  for(const id of modals){
+    const el=document.getElementById(id);
+    if(el&&el.style.display!=='none'){el.style.display='none';return;}
+  }
+  const sb=document.getElementById('sidebar');
+  if(sb&&sb.classList.contains('open')){closeSb();return;}
+  // 깊은 뷰에서 뒤로가기 → 이전 뷰로
+  if(state.view==='day'){setView('month');return;}
+  if(state.view==='filtered'){
+    state.projFilter=null;state.timedFilter=null;state.filterMode=null;
+    setView('month');return;
+  }
+  if(['travel','tasks','todos','haegobj','golf','studio','period'].includes(state.view)){
+    setView('home');return;
+  }
+});
+let _tx=0,_ty=0;
+document.addEventListener('wheel',e=>{if(e.target.closest('.modal-overlay,.sidebar,.work-time-inp,input,textarea,select'))return;clearTimeout(window._wt);window._wt=setTimeout(()=>navigate(e.deltaY>0?1:-1),80);},{passive:true});
+document.addEventListener('touchstart',e=>{if(e.target.closest('.modal-overlay,.sidebar,input,textarea,select,[data-h]'))return;_tx=e.touches[0].clientX;_ty=e.touches[0].clientY;},{passive:true});
+document.addEventListener('touchend',e=>{if(e.target.closest('.modal-overlay,.sidebar,input,textarea,select,[data-h]'))return;const dx=e.changedTouches[0].clientX-_tx,dy=e.changedTouches[0].clientY-_ty;if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)*1.5)navigate(dx<0?1:-1);},{passive:true});
+
+// ── Init ──────────────────────────────────────────────────
+(async()=>{const{data:{session}}=await sb.auth.getSession();if(session?.user)await showApp(session.user);else showLogin();})();
+sb.auth.onAuthStateChange(async(event,session)=>{if(event==='SIGNED_IN'&&session?.user&&!currentUser)await showApp(session.user);else if(event==='SIGNED_OUT')showLogin();});
+</script>
+</body>
+</html>
