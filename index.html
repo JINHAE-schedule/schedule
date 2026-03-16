@@ -66,7 +66,11 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 .body{flex:1;display:flex;overflow:hidden;}
 
 /* Sidebar */
-.sidebar{width:var(--sb);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;position:fixed;top:0;left:0;height:100vh;z-index:150;}
+.sidebar{width:var(--sb);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;position:fixed;top:0;left:0;height:100vh;z-index:150;}
+/* sidebar 내부 스크롤 래퍼 - Projects가 늘어도 Records까지 항상 보임 */
+.sb-scroll{flex:1;overflow-y:auto;overflow-x:hidden;}
+.sb-scroll::-webkit-scrollbar{width:3px;}
+.sb-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
 .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:199;}
 .sb-header{padding:14px 14px 8px;border-bottom:1px solid var(--border);flex-shrink:0;}
 .sb-logo{font-family:var(--font-ui);font-size:15px;font-weight:600;letter-spacing:-.3px;}
@@ -244,8 +248,10 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
     transform:translateX(-100%);
     transition:transform .25s ease;
     box-shadow:4px 0 20px rgba(0,0,0,.15);
-    overflow-y:auto;
-    padding-bottom:calc(env(safe-area-inset-bottom) + 40px) !important;
+    overflow:hidden;
+  }
+  .sb-scroll{
+    padding-bottom:calc(env(safe-area-inset-bottom) + 40px);
   }
   .sidebar.open{transform:translateX(0);}
   .sb-overlay.open{display:block;}
@@ -367,6 +373,8 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
         </div>
       </div>
 
+      <div class="sb-scroll">
+
       <div class="nav-sec">
         <div class="nav-lbl">View</div>
         <button class="nav-btn" data-view="home" onclick="setView('home')"><span class="nav-icon">🏠</span>Home</button>
@@ -417,6 +425,8 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
         <button class="nav-btn" data-view="period" onclick="setView('period')"><span class="nav-icon" style="color:var(--pink)">🌸</span>Period</button>
       </div>
       <div id="backup-status"></div>
+
+      </div><!-- /sb-scroll -->
     </aside>
 
     <div class="main">
@@ -733,6 +743,66 @@ function setSyncing(){
 function setSynced(){document.getElementById('sync-dot').className='sync-dot';document.getElementById('sync-txt').textContent='Synced';}
 function setSyncErr(m){document.getElementById('sync-dot').className='sync-dot error';document.getElementById('sync-txt').textContent=m||'Error';}
 
+// ── Pending Retry Queue ───────────────────────────────────
+const _retryQueue=[];
+let _retryTimer=null;
+function enqueueRetry(fn,label){
+  _retryQueue.push({fn,label,retries:0});
+  scheduleRetry();
+}
+function scheduleRetry(){
+  if(_retryTimer)return;
+  _retryTimer=setTimeout(flushRetryQueue,8000);
+}
+async function flushRetryQueue(){
+  _retryTimer=null;
+  if(!currentUser||_retryQueue.length===0)return;
+  const MAX_RETRIES=3;
+  const items=[..._retryQueue];_retryQueue.length=0;
+  for(const item of items){
+    try{
+      await item.fn();
+      console.log('[retry] success:',item.label);
+    }catch(e){
+      item.retries++;
+      if(item.retries<MAX_RETRIES){
+        _retryQueue.push(item);
+        console.warn('[retry] queued again:',item.label,'attempt',item.retries);
+      } else {
+        console.error('[retry] gave up:',item.label);
+      }
+    }
+  }
+  if(_retryQueue.length>0)scheduleRetry();
+}
+
+// ── Immediate Flush (pagehide / beforeunload) ─────────────
+let _homeNoteTimer=null;
+let _haegobjTimer={};
+async function flushPendingMemos(){
+  if(!currentUser)return;
+  const tasks=[];
+  if(_homeNoteTimer!==null){
+    clearTimeout(_homeNoteTimer);_homeNoteTimer=null;
+    tasks.push(saveHomeNote(data.homeNote));
+  }
+  Object.keys(_haegobjTimer||{}).forEach(ds=>{
+    if(_haegobjTimer[ds]!=null){
+      clearTimeout(_haegobjTimer[ds]);_haegobjTimer[ds]=null;
+      const val=data.haegobjMemos[ds]||'';
+      tasks.push(sb.from('class_memos').upsert(
+        {user_id:currentUser.id,project_id:`haegobj_${ds}`,week:0,content:val},
+        {onConflict:'user_id,project_id,week'}
+      ));
+    }
+  });
+  if(tasks.length>0){
+    try{ await Promise.all(tasks); }catch(e){ console.warn('flush failed:',e); }
+  }
+}
+window.addEventListener('pagehide',()=>{ flushPendingMemos(); });
+window.addEventListener('beforeunload',()=>{ flushPendingMemos(); });
+
 // ── Auth ──────────────────────────────────────────────────
 async function signIn(){
   document.getElementById('login-loading').textContent='Signing in...';
@@ -859,7 +929,16 @@ async function saveTask(td){
   const{error}=await sb.from('todos').upsert({id:td.id,user_id:currentUser.id,title:td.title,date:td.date||null,project_id:td.projectId||null,done:td.done,event_id:td.eventId||null});
   if(error){setSyncErr('Save Error');return error.message;}setSynced();return null;
 }
-async function delTask(id){setSyncing();await sb.from('todos').delete().eq('id',id).eq('user_id',currentUser.id);setSynced();}
+async function delTask(id){
+  const backup=data.tasks.find(t=>t.id===id);
+  setSyncing();
+  const{error}=await sb.from('todos').delete().eq('id',id).eq('user_id',currentUser.id);
+  if(error){
+    if(backup)data.tasks.push(backup);
+    setSyncErr('Delete Error');
+    enqueueRetry(()=>delTask(id),'delTask:'+id);
+  } else { setSynced(); }
+}
 async function saveProj(p){setSyncing();const{error}=await sb.from('projects').upsert({id:p.id,user_id:currentUser.id,name:p.name,color:p.color});if(error)setSyncErr('Save Error');else setSynced();}
 async function delProj(id){setSyncing();await sb.from('projects').delete().eq('id',id).eq('user_id',currentUser.id);setSynced();}
 async function saveGolfRec(ds,rec){
@@ -1051,7 +1130,6 @@ function renderHome(){
   html+=`</div>`;
   document.getElementById('main-content').innerHTML=html;
 }
-let _homeNoteTimer=null;
 function homeNoteChange(v){data.homeNote=v;clearTimeout(_homeNoteTimer);_homeNoteTimer=setTimeout(()=>saveHomeNote(v),1500);}
 async function addHomeTask(){
   const inp=document.getElementById('home-todo-inp');
@@ -1503,7 +1581,6 @@ function renderHaegobj(){
   });
 }
 
-let _haegobjTimer={};
 function saveHaegobjMemo(ds,val){
   data.haegobjMemos[ds]=val;
   clearTimeout(_haegobjTimer[ds]);
@@ -1961,7 +2038,12 @@ async function addTodosViewTask(ds,inp){
   const td={id:makeId(),title,date:ds,projectId:pid,done:false,eventId:''};
   data.tasks.push(td);inp.value='';
   renderTodos();renderAll();
-  await saveTask(td);
+  const err=await saveTask(td);
+  if(err){
+    data.tasks=data.tasks.filter(t=>t.id!==td.id);
+    renderTodos();renderAll();
+    enqueueRetry(()=>saveTask(td),'addTodosViewTask:'+td.id);
+  }
 }
 
 // ── Task Calendar ────────────────────────────────────────
@@ -2399,7 +2481,14 @@ async function addSubtask(){
   const td={id:makeId(),title,date:ev?.date||todayStr(),projectId:ev?.projectId||'',done:false,eventId:_mId};
   data.tasks.push(td);inp.value='';
   renderSubtasks(data.tasks.filter(t=>t.eventId===_mId));
-  renderAll();await saveTask(td);
+  renderAll();
+  const err=await saveTask(td);
+  if(err){
+    data.tasks=data.tasks.filter(t=>t.id!==td.id);
+    renderSubtasks(data.tasks.filter(t=>t.eventId===_mId));
+    renderAll();
+    enqueueRetry(()=>saveTask(td),'addSubtask:'+td.id);
+  }
 }
 
 // ── Tasks ─────────────────────────────────────────────────
@@ -2423,13 +2512,25 @@ async function deleteTask(id){
 async function addLinkedTask(evId,date,pid,inp){
   const title=inp.value.trim();if(!title)return;
   const td={id:makeId(),title,date,projectId:pid,done:false,eventId:evId};
-  data.tasks.push(td);inp.value='';renderAll();await saveTask(td);
+  data.tasks.push(td);inp.value='';renderAll();
+  const err=await saveTask(td);
+  if(err){
+    data.tasks=data.tasks.filter(t=>t.id!==td.id);
+    renderAll();
+    enqueueRetry(()=>saveTask(td),'addLinkedTask:'+td.id);
+  }
 }
 async function addDayTask(ds){
   const inp=document.getElementById('day-task-inp');
   const title=inp.value.trim();if(!title)return;
   const td={id:makeId(),title,date:ds,projectId:state.projFilter||'',done:false,eventId:''};
-  data.tasks.push(td);inp.value='';renderAll();await saveTask(td);
+  data.tasks.push(td);inp.value='';renderAll();
+  const err=await saveTask(td);
+  if(err){
+    data.tasks=data.tasks.filter(t=>t.id!==td.id);
+    renderAll();
+    enqueueRetry(()=>saveTask(td),'addDayTask:'+td.id);
+  }
 }
 
 // Todo Panel
@@ -2574,7 +2675,12 @@ async function addDayTodoPanel(ds,inp){
   data.tasks.push(td);
   inp.value='';
   renderTodoPanel();renderAll();
-  await saveTask(td);
+  const err=await saveTask(td);
+  if(err){
+    data.tasks=data.tasks.filter(t=>t.id!==td.id);
+    renderTodoPanel();renderAll();
+    enqueueRetry(()=>saveTask(td),'addDayTodoPanel:'+td.id);
+  }
 }
 
 
@@ -2611,7 +2717,14 @@ function renderProjEdit(){
 }
 async function renameProj(id,name){
   const p=data.projects.find(x=>x.id===id);if(!p||p.name===name)return;
-  p.name=name;renderSidebar();await saveProj(p);
+  const oldName=p.name;
+  p.name=name;renderSidebar();
+  const{error}=await sb.from('projects').upsert({id:p.id,user_id:currentUser.id,name:p.name,color:p.color});
+  if(error){
+    p.name=oldName;renderSidebar();
+    setSyncErr('Save Error');
+    enqueueRetry(()=>saveProj(p),'renameProj:'+p.id);
+  } else { setSynced(); }
 }
 function moveProjUp(id){
   const order=orderedProjects().map(p=>p.id);
@@ -2633,7 +2746,14 @@ async function addProject(){
   const p={id:makeId(),name:fullName,color:_newProjColor};
   data.projects.push(p);
   document.getElementById('new-proj-name').value='';document.getElementById('new-proj-emoji').value='';
-  renderProjEdit();renderSidebar();renderAll();await saveProj(p);
+  renderProjEdit();renderSidebar();renderAll();
+  const{error}=await sb.from('projects').upsert({id:p.id,user_id:currentUser.id,name:p.name,color:p.color});
+  if(error){
+    data.projects=data.projects.filter(x=>x.id!==p.id);
+    renderProjEdit();renderSidebar();renderAll();
+    setSyncErr('Save Error');
+    enqueueRetry(()=>saveProj(p),'addProject:'+p.id);
+  } else { setSynced(); }
 }
 async function deleteProj(id){
   if(!confirm('Delete this project?'))return;
@@ -2891,8 +3011,18 @@ function exportData(){
 // ── History & Mobile ──────────────────────────────────────
 // 탭 복귀시 동기화 상태 리셋
 let _reloadInProgress=false;
+let _lastReloadAt=0;        // 마지막 reload 완료 시각 (ms)
+let _reloadDebounceTimer=null;
+const RELOAD_COOLDOWN=4000; // 4초 이내 재실행 skip
+
 async function reloadOnResume(){
-  if(!currentUser||_reloadInProgress)return;
+  // 저장 중이면 skip (sync-dot가 syncing 상태인지 확인)
+  const dot=document.getElementById('sync-dot');
+  const isSaving=dot&&dot.classList.contains('syncing');
+  if(!currentUser||_reloadInProgress||isSaving)return;
+  // 쿨다운: 마지막 reload로부터 RELOAD_COOLDOWN ms 이내면 skip
+  const now=Date.now();
+  if(now-_lastReloadAt<RELOAD_COOLDOWN)return;
   _reloadInProgress=true;
   try{
     setSyncing();
@@ -2911,6 +3041,7 @@ async function reloadOnResume(){
     }
     currentUser=session.user;
     await loadAll();
+    _lastReloadAt=Date.now();
   }catch(e){
     console.error('resume reload failed:',e);
     setSyncErr('Sync failed');
@@ -2918,16 +3049,18 @@ async function reloadOnResume(){
     _reloadInProgress=false;
   }
 }
+function scheduleReloadOnResume(){
+  // debounce: 연속 이벤트(visibilitychange + pageshow 동시) 중복 방지
+  clearTimeout(_reloadDebounceTimer);
+  _reloadDebounceTimer=setTimeout(reloadOnResume,300);
+}
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible'){
-    reloadOnResume();
-  }
+  if(document.visibilityState==='visible') scheduleReloadOnResume();
+  else if(document.visibilityState==='hidden') flushPendingMemos();
 });
 window.addEventListener('pageshow',(e)=>{
   // bfcache(뒤로가기 캐시)에서 복원될 때도 재동기화
-  if(e.persisted||document.visibilityState==='visible'){
-    reloadOnResume();
-  }
+  if(e.persisted||document.visibilityState==='visible') scheduleReloadOnResume();
 });
 
 function setupHistory(){
