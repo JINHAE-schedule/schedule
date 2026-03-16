@@ -1108,7 +1108,7 @@ function renderAll(){
 }
 function updateTitle(){
   const c=state.cursor;
-  const titles={home:'🏠 Home',year:c.getFullYear()+'년',filtered:'',haegobj:'👗 HAEGOBJ',todos:'✓ Todo List',tasks:'📋 Tasks — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',travel:'✈️ Travel — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',month:c.getFullYear()+'년 '+(c.getMonth()+1)+'월',day:c.getFullYear()+'년 '+(c.getMonth()+1)+'월 '+c.getDate()+'일 ('+['일','월','화','수','목','금','토'][c.getDay()]+')',golf:'⛳ Golf',studio:'🏢 Studio',period:'🌸 Period — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월'};
+  const titles={home:'🏠 Home',year:c.getFullYear()+'년',filtered:'',haegobj:'👗 HAEGOBJ',todos:'✓ Todo List',tasks:'📋 Tasks — '+c.getFullYear()+'년 '+(c.getMonth()+1)+'월',travel:'✈️ Travel',month:c.getFullYear()+'년 '+(c.getMonth()+1)+'월',day:c.getFullYear()+'년 '+(c.getMonth()+1)+'월 '+c.getDate()+'일 ('+['일','월','화','수','목','금','토'][c.getDay()]+')',golf:'⛳ Golf',studio:'🏢 Studio',period:'🌸 Period'};
   document.getElementById('main-title').textContent=titles[state.view]||'';
 }
 function renderSidebar(){
@@ -1360,7 +1360,7 @@ function renderFiltered(){
   // 통합 일정 목록 (전체 기간)
   if(filteredTimedEvs.length>0){
     const cat=hasTimedFilter?timedCat(hasTimedFilter):null;
-    const sortedTes=filteredTimedEvs.sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+    const sortedTes=filteredTimedEvs.sort((a,b)=>b.date.localeCompare(a.date)||b.time.localeCompare(a.time));
     html+=`<div class="card" style="overflow:hidden;margin-bottom:12px">
       <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px">
         ${cat?`<span style="width:10px;height:10px;border-radius:50%;background:${cat.color};display:inline-block"></span>${cat.emoji?cat.emoji+' ':''}${escH(cat.name)}`:'⏰ Timed Events'} 전체 일정
@@ -1387,7 +1387,7 @@ function renderFiltered(){
 
   if(filteredProjEvs.length>0){
     const p=hasProjFilter?proj(hasProjFilter):null;
-    const sortedEvs=filteredProjEvs.sort((a,b)=>a.date.localeCompare(b.date));
+    const sortedEvs=filteredProjEvs.sort((a,b)=>b.date.localeCompare(a.date));
     html+=`<div class="card" style="overflow:hidden">
       <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px">
         ${p?`<span style="width:10px;height:10px;border-radius:50%;background:${p.color};display:inline-block"></span>${escH(p.name)}`:'📁 Projects'} 전체 일정
@@ -1450,7 +1450,7 @@ function renderDay(){
   // Time block columns - 3 fixed, user-named
   const cols=window.dayBlockCols;
 
-  html+=`<div class="day-view">`;
+  let html=`<div class="day-view">`;
 
   // Events header
   html+=`<div class="card" style="overflow:hidden">
@@ -1941,6 +1941,7 @@ function renderPeriod(){
 
     let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
     <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월</span>
   </div>`;
   html+=`<div class="work-layout"><div class="card" style="overflow:hidden">
     <div class="work-cal-hdr">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d,i)=>`<div class="work-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`).join('')}</div>
@@ -2221,6 +2222,7 @@ function renderTravel(){
 
   let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
     <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
+    <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월</span>
     <button onclick="openTravelModal()" class="btn-save" style="margin-left:auto;border-radius:20px;font-size:12px;padding:5px 14px">+ Add</button>
   </div>`;
   const monthTravels=data.travels.filter(t=>{
