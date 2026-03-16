@@ -102,13 +102,13 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 .card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
 
 /* Month calendar */
-.month-view{border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);}
-.month-hdr{display:grid;grid-template-columns:repeat(7,1fr);background:var(--surface2);}
+.month-view{border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);width:100%;}
+.month-hdr{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:var(--surface2);}
 .month-dow{padding:7px 4px;text-align:center;font-size:11px;font-weight:600;font-family:var(--font-ui);color:var(--text3);}
 .month-dow.sat{color:var(--accent);}
 .month-dow.sun{color:var(--red);}
-.month-grid{display:grid;grid-template-columns:repeat(7,1fr);}
-.month-cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:5px 5px;cursor:pointer;transition:background .1s;background:var(--surface);min-height:96px;}
+.month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));}
+.month-cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:5px 5px;cursor:pointer;transition:background .1s;background:var(--surface);min-height:96px;min-width:0;overflow:hidden;}
 .month-cell:hover{background:var(--accent-bg);}
 .month-cell.other{opacity:.35;cursor:default;background:var(--surface2);}
 .month-cell.other:hover{background:var(--surface2);}
@@ -241,6 +241,12 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
   /* M-4: HAEGOBJ 세로 */
   .haegobj-weeks{flex-direction:column !important;}
   .haegobj-weeks > div{width:100% !important;}
+  /* M-1: 달력 가독성 */
+  .month-cell{min-height:64px !important;padding:3px 2px !important;}
+  .month-cell-num{font-size:10px !important;}
+  .month-ev{font-size:9px !important;padding:1px 3px !important;margin-bottom:1px !important;}
+  .month-dow{font-size:10px !important;padding:3px 2px !important;}
+  .month-hdr div{font-size:10px !important;}
   .sidebar.open{transform:translateX(0);}
   .sb-overlay.open{display:block;}
   .ham-btn{display:flex !important;}
@@ -492,6 +498,10 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
   </div>
   <div id="golf-rounds"></div>
   <button id="golf-add-round-btn" onclick="addGolfRound()" style="width:100%;margin-top:10px;padding:7px;border:1px dashed var(--border2);border-radius:var(--radius-sm);background:none;cursor:pointer;color:var(--text2);font-size:13px">+ Add 2nd Round</button>
+  <div class="form-row" style="margin-top:10px">
+    <label>메모</label>
+    <textarea id="golf-memo" rows="2" placeholder="" style="resize:none;font-family:var(--font)"></textarea>
+  </div>
   <div class="modal-footer">
     <button class="btn-del" onclick="clearGolfDay()">Delete</button>
     <button class="btn-cancel" onclick="closeGolfModal()">Cancel</button>
@@ -1485,6 +1495,7 @@ function renderGolf(){
     if(rounds.length>0){
       rounds.forEach(r=>{const base=Number(r.amount)||0,over=Number(r.overFee)||0;content+=`<div class="golf-round-tag" onclick="openGolfModal('${ds}')"><span class="golf-holes">${r.holes}H</span><span style="color:var(--text2);font-size:10px">${base.toLocaleString()}${over>0?`<span style="color:#0891B2"> +${over.toLocaleString()}</span>`:''}</span></div>`;});
       if(rounds.length<2)content+=`<div class="golf-add" onclick="openGolfModal('${ds}')">+</div>`;
+      if(rec.memo)content+=`<div style="font-size:9px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:1px 2px">${escH(rec.memo)}</div>`;
     } else if(!weather){content=`<div class="golf-empty" onclick="openGolfModal('${ds}')">+</div>`;}
     html+=`<div class="work-cell golf-cell${isTod?' today':''}${holiday?' sun':dow===6&&!isTod?' sat':dow===0&&!isTod?' sun':''}${rounds.some(r=>Number(r.amount)>0)?' golf-worked':''}">
       <div class="work-num" style="${holiday?'color:var(--red)':''}">${d}${holiday?`<span style="font-size:8px;margin-left:2px">${holName(ds)}</span>`:''}${rounds.length>1?` <span style="font-size:9px;color:#BA7517">×${rounds.length}</span>`:''}</div>
@@ -1557,6 +1568,7 @@ function openGolfModal(ds){
   const d=parseDate(ds);
   document.getElementById('golf-modal-date').textContent=`${d.getMonth()+1}월 ${d.getDate()}일`;
   document.getElementById('golf-modal-ds').value=ds;
+  document.getElementById('golf-memo').value=g&&g.memo?g.memo:'';
   document.querySelectorAll('.golf-wx-btn').forEach(b=>b.classList.toggle('active',b.textContent===window._gWx));
   renderGolfRounds();
   document.getElementById('golf-modal').style.display='flex';
@@ -1585,7 +1597,7 @@ function renderGolfRounds(){
         </div>
         <div style="width:90px">
           <div style="font-size:10px;color:#0891B2;margin-bottom:3px">오버피 (만원)</div>
-          <input class="golf-amt" type="text" inputmode="numeric" placeholder="예: 3" style="border-color:#0891B2;color:#0891B2" value="${r.overFee?(Number(r.overFee)/10000):''}" oninput="setGolfOver(${i},this.value)" onfocus="this.select()">
+          <input class="golf-amt" type="text" inputmode="decimal" placeholder="예: 2.5" style="border-color:#0891B2;color:#0891B2" value="${r.overFee?(Number(r.overFee)/10000):''}" oninput="setGolfOver(${i},this.value)" onfocus="this.select()">
         </div>
       </div>
     </div>${i<rounds.length-1?'<hr style="border:none;border-top:1px solid var(--border);margin:4px 0">':''}
@@ -1596,7 +1608,7 @@ function renderGolfRounds(){
 function setGolfWx(icon){window._gWx=window._gWx===icon?'':icon;document.querySelectorAll('.golf-wx-btn').forEach(b=>b.classList.toggle('active',b.textContent===window._gWx));}
 function setGolfHoles(i,h){window._gRounds[i].holes=h;renderGolfRounds();}
 function setGolfHolesCustom(i,v){const h=parseInt(v);if(h>0)window._gRounds[i].holes=h;}
-const toWon=v=>{const n=Number(String(v).replace(/,/g,'').replace(/[^0-9]/g,''));if(!n)return'';return n<=9999?n*10000:n;};
+const toWon=v=>{const s=String(v).replace(/,/g,'').replace(/[^0-9.]/g,'');const n=Number(s);if(!n)return'';return n<1000?Math.round(n*10000):n;};
 function setGolfAmt(i,v){window._gRounds[i].amount=toWon(v);}
 function setGolfOver(i,v){window._gRounds[i].overFee=toWon(v);}
 function addGolfRound(){window._gRounds.push({holes:18,amount:'',overFee:''});renderGolfRounds();}
@@ -1608,9 +1620,11 @@ async function saveGolfModal(){
   window._gRounds.forEach(r=>{if(fields[fi])r.amount=toWon(fields[fi++].value);if(fields[fi])r.overFee=toWon(fields[fi++].value);});
   const valid=window._gRounds.filter(r=>Number(r.amount)>0);
   const wx=window._gWx||'';
-  if(valid.length>0||wx){data.golf[ds]={rounds:valid,weather:wx};}else{delete data.golf[ds];}
+  const memo=document.getElementById('golf-memo').value.trim();
+  const rec={rounds:valid,weather:wx,memo};
+  if(valid.length>0||wx||memo){data.golf[ds]=rec;}else{delete data.golf[ds];}
   closeGolfModal();renderGolf();
-  await saveGolfRec(ds,(valid.length>0||wx)?{rounds:valid,weather:wx}:null);
+  await saveGolfRec(ds,(valid.length>0||wx||memo)?rec:null);
 }
 async function clearGolfDay(){delete data.golf[window._gDs];closeGolfModal();renderGolf();await saveGolfRec(window._gDs,null);}
 function closeGolfModal(){document.getElementById('golf-modal').style.display='none';}
