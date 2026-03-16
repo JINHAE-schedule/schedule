@@ -693,6 +693,7 @@ async function showApp(user){
 // ── Load All ──────────────────────────────────────────────
 async function loadAll(){
   setSyncing();
+  document.getElementById('main-content').innerHTML='<div class="empty">동기화 중...</div>';
   try{
     const uid=currentUser.id;
     const[teRes,tcRes,peRes,tdRes,prRes,gRes,oRes,ccRes,anRes,plRes,hnRes,cmRes,trRes]=await Promise.all([
@@ -2843,33 +2844,34 @@ function exportData(){
 
 // ── History & Mobile ──────────────────────────────────────
 // 탭 복귀시 동기화 상태 리셋
-document.addEventListener('visibilitychange',async()=>{
-  if(document.visibilityState==='visible'){
-    // 동기화 멈춤 무조건 리셋
-    clearTimeout(_syncTimer);
-    setSynced();
-    // 세션 유효성 확인 및 자동 갱신
-    if(sb&&currentUser){
-      try{
-        const{data:{session},error}=await sb.auth.getSession();
-        if(error||!session){
-          try{
-            const{data:r}=await sb.auth.refreshSession();
-            if(!r?.session){
-              document.getElementById('app').style.display='none';
-              document.getElementById('login-screen').style.display='flex';
-            }
-          }catch(e2){
-            document.getElementById('app').style.display='none';
-            document.getElementById('login-screen').style.display='flex';
-          }
-        }
-      }catch(e){
-        setSynced();
-      }
+let _reloadInProgress=false;
+async function reloadOnResume(){
+  if(!currentUser||_reloadInProgress)return;
+  _reloadInProgress=true;
+  try{
+    setSyncing();
+    const{data:{session}}=await sb.auth.getSession();
+    if(!session?.user){
+      document.getElementById('app').style.display='none';
+      document.getElementById('login-screen').style.display='flex';
+      return;
     }
+    currentUser=session.user;
+    await loadAll();
+    renderAll();
+    setSynced();
+  }catch(e){
+    console.error('resume reload failed:',e);
+    setSyncErr('Sync failed');
+  }finally{
+    _reloadInProgress=false;
   }
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible')reloadOnResume();
 });
+window.addEventListener('focus',()=>{reloadOnResume();});
+window.addEventListener('pageshow',()=>{reloadOnResume();});
 
 function setupHistory(){
   if(!history.state||!history.state.app){
