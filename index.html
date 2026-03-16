@@ -2845,12 +2845,26 @@ function exportData(){
 // ── History & Mobile ──────────────────────────────────────
 // 탭 복귀시 동기화 상태 리셋
 let _reloadInProgress=false;
+let _lastReload=0;
 async function reloadOnResume(){
-  if(!currentUser||_reloadInProgress)return;
+  if(!currentUser)return;
+  // 5초 내 중복 실행 방지
+  const now=Date.now();
+  if(_reloadInProgress||(now-_lastReload<5000))return;
   _reloadInProgress=true;
+  _lastReload=now;
+  console.log('[resume] reloadOnResume 시작');
   try{
     setSyncing();
-    const{data:{session}}=await sb.auth.getSession();
+    // 세션 갱신 시도
+    let session;
+    try{
+      const r=await sb.auth.refreshSession();
+      session=r.data?.session;
+    }catch(e){
+      const r2=await sb.auth.getSession();
+      session=r2.data?.session;
+    }
     if(!session?.user){
       document.getElementById('app').style.display='none';
       document.getElementById('login-screen').style.display='flex';
@@ -2858,20 +2872,23 @@ async function reloadOnResume(){
     }
     currentUser=session.user;
     await loadAll();
-    renderAll();
-    setSynced();
   }catch(e){
-    console.error('resume reload failed:',e);
+    console.error('[resume] 실패:',e);
     setSyncErr('Sync failed');
   }finally{
     _reloadInProgress=false;
   }
 }
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible')reloadOnResume();
+  if(document.visibilityState==='visible'){
+    console.log('[resume] visibilitychange visible');
+    reloadOnResume();
+  }
 });
-window.addEventListener('focus',()=>{reloadOnResume();});
-window.addEventListener('pageshow',()=>{reloadOnResume();});
+window.addEventListener('focus',()=>{
+  console.log('[resume] focus');
+  reloadOnResume();
+});
 
 function setupHistory(){
   if(!history.state||!history.state.app){
