@@ -242,7 +242,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
   .haegobj-weeks{flex-direction:column !important;}
   .haegobj-weeks > div{width:100% !important;}
   /* M-1: 달력 가독성 */
-  .month-cell{min-height:64px !important;padding:3px 2px !important;}
+  .month-cell{min-height:90px !important;padding:3px 2px !important;}
   .month-cell-num{font-size:10px !important;}
   .month-ev{font-size:9px !important;padding:1px 3px !important;margin-bottom:1px !important;}
   .month-dow{font-size:10px !important;padding:3px 2px !important;}
@@ -1495,7 +1495,7 @@ function renderGolf(){
     if(rounds.length>0){
       rounds.forEach(r=>{const base=Number(r.amount)||0,over=Number(r.overFee)||0;content+=`<div class="golf-round-tag" onclick="openGolfModal('${ds}')"><span class="golf-holes">${r.holes}H</span><span style="color:var(--text2);font-size:10px">${base.toLocaleString()}${over>0?`<span style="color:#0891B2"> +${over.toLocaleString()}</span>`:''}</span></div>`;});
       if(rounds.length<2)content+=`<div class="golf-add" onclick="openGolfModal('${ds}')">+</div>`;
-      if(rec.memo)content+=`<div style="font-size:9px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:1px 2px">${escH(rec.memo)}</div>`;
+      if(g&&g.memo)content+=`<div style="font-size:9px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:1px 2px">${escH(g.memo)}</div>`;
     } else if(!weather){content=`<div class="golf-empty" onclick="openGolfModal('${ds}')">+</div>`;}
     html+=`<div class="work-cell golf-cell${isTod?' today':''}${holiday?' sun':dow===6&&!isTod?' sat':dow===0&&!isTod?' sun':''}${rounds.some(r=>Number(r.amount)>0)?' golf-worked':''}">
       <div class="work-num" style="${holiday?'color:var(--red)':''}">${d}${holiday?`<span style="font-size:8px;margin-left:2px">${holName(ds)}</span>`:''}${rounds.length>1?` <span style="font-size:9px;color:#BA7517">×${rounds.length}</span>`:''}</div>
@@ -2845,25 +2845,27 @@ function exportData(){
 // 탭 복귀시 동기화 상태 리셋
 document.addEventListener('visibilitychange',async()=>{
   if(document.visibilityState==='visible'){
-    // 동기화 중에 멈춰있으면 리셋
-    if(document.getElementById('sync-dot')?.classList.contains('syncing')){
-      setSynced();
-    }
-    // 세션 유효성 확인
+    // 동기화 멈춤 무조건 리셋
+    clearTimeout(_syncTimer);
+    setSynced();
+    // 세션 유효성 확인 및 자동 갱신
     if(sb&&currentUser){
       try{
-        const{data:{session}}=await sb.auth.getSession();
-        if(!session){
-          // 세션 만료 - 조용히 재로그인 시도
-          const{data}=await sb.auth.refreshSession();
-          if(!data.session){
-            // 재로그인 필요
+        const{data:{session},error}=await sb.auth.getSession();
+        if(error||!session){
+          try{
+            const{data:r}=await sb.auth.refreshSession();
+            if(!r?.session){
+              document.getElementById('app').style.display='none';
+              document.getElementById('login-screen').style.display='flex';
+            }
+          }catch(e2){
             document.getElementById('app').style.display='none';
             document.getElementById('login-screen').style.display='flex';
           }
         }
       }catch(e){
-        setSynced(); // 에러여도 멈추지 않게
+        setSynced();
       }
     }
   }
