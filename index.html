@@ -803,7 +803,10 @@ async function flushPendingMemos(){
     try{ await Promise.all(tasks); }catch(e){ console.warn('flush failed:',e); }
   }
 }
-window.addEventListener('pagehide',()=>{ flushPendingMemos(); });
+window.addEventListener('pagehide',()=>{
+  _lastHiddenAt=Date.now();
+  flushPendingMemos();
+});
 window.addEventListener('beforeunload',()=>{ flushPendingMemos(); });
 
 // ── Auth ──────────────────────────────────────────────────
@@ -1261,7 +1264,7 @@ function renderMonth(){
       html+=`<div class="month-cell-num" style="${numColor}${cellBg&&!cell.other?`color:${cellBg};font-weight:700;`:''}">
         <span>${cell.date.getDate()}</span>${cellBg&&!cell.other?`<span class="cell-dot" style="background:${cellBg}"></span>`:''}${lbls}
       </div>
-      ${cellEmoji?`<div style="font-size:20px;text-align:center;line-height:1;margin:2px 0;cursor:pointer" onclick="event.stopPropagation();openCellColorPicker('${ds}',event)">${cellEmoji}</div>`:''}`;
+      ${cellEmoji?`<div style="font-size:14px;text-align:center;line-height:1;margin:2px 0;cursor:pointer" onclick="event.stopPropagation();openCellColorPicker('${ds}',event)">${cellEmoji}</div>`:''}`;
       // 전체 표시 (Timed + Project + Task + Travel)
       data.timedEvents.filter(t=>t.date===ds).sort((a,b)=>a.time.localeCompare(b.time)).forEach(te=>{const cat=timedCat(te.categoryId),c=cat.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)};display:flex;gap:2px" onclick="event.stopPropagation();openEditItem('timed','${te.id}')"><span style="opacity:.75;font-size:9px;flex-shrink:0">${te.time}</span><span style="overflow:hidden;text-overflow:ellipsis">${escH(te.title)}</span></div>`;});
       data.projEvents.filter(e=>e.date===ds).forEach(ev=>{const p=proj(ev.projectId),c=p.color||'#4472C4';html+=`<div class="month-ev" style="background:${evBg(c)};color:${evTxt(c)}" onclick="event.stopPropagation();openEditItem('proj','${ev.id}')">${escH(ev.title)}</div>`;});
@@ -1447,12 +1450,13 @@ function renderDay(){
   // Time block columns - 3 fixed, user-named
   const cols=window.dayBlockCols;
 
-  let html=`<div class="day-view">`;
+  html+=`<div class="day-view">`;
 
   // Events header
   html+=`<div class="card" style="overflow:hidden">
     <div style="padding:9px 14px;font-size:13px;font-weight:500;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
-      ${state.cursor.getMonth()+1}월 ${state.cursor.getDate()}일
+      <button onclick="goToday()" class="btn-cancel" style="padding:3px 10px;font-size:11px">Today</button>
+      <span>${state.cursor.getMonth()+1}월 ${state.cursor.getDate()}일</span>
       ${hol?`<span style="color:var(--red);font-size:11px;font-weight:400">· ${hol}</span>`:''}
       <button onclick="openAddModal('${ds}')" class="btn-save" style="margin-left:auto;border-radius:16px;font-size:11px;padding:4px 12px">+ Add</button>
     </div>`;
@@ -1679,7 +1683,6 @@ function renderGolf(){
     <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월</span>
   </div>`;
   html+=`<div class="work-layout"><div class="card" style="overflow:hidden">
-    <div style="padding:7px;font-size:11px;color:var(--text2);text-align:center;border-bottom:1px solid var(--border)">라운드 기록</div>
     <div class="work-cal-hdr">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d,i)=>`<div class="work-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`).join('')}</div>
     <div class="work-grid">`;
   for(let i=0;i<offset;i++)html+=`<div class="work-cell empty"></div>`;
@@ -1847,7 +1850,6 @@ function renderStudio(){
     <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월</span>
   </div>`;
   html+=`<div class="work-layout"><div class="card" style="overflow:hidden">
-    <div style="padding:7px;font-size:11px;color:var(--text2);text-align:center;border-bottom:1px solid var(--border)">출퇴근 시간</div>
     <div class="work-cal-hdr">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d,i)=>`<div class="work-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`).join('')}</div>
     <div class="work-grid">`;
   for(let i=0;i<offset;i++)html+=`<div class="work-cell empty"></div>`;
@@ -1939,10 +1941,8 @@ function renderPeriod(){
 
     let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
     <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
-    <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월</span>
   </div>`;
   html+=`<div class="work-layout"><div class="card" style="overflow:hidden">
-    <div style="padding:7px;font-size:11px;color:var(--text2);text-align:center;border-bottom:1px solid var(--border)">생리 기록 (날짜 클릭으로 기록)</div>
     <div class="work-cal-hdr">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d,i)=>`<div class="work-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`).join('')}</div>
     <div class="work-grid">`;
   for(let i=0;i<offset;i++)html+=`<div class="work-cell empty"></div>`;
@@ -2216,55 +2216,48 @@ let _editTravelId=null;
 function renderTravel(){
   const yr=state.cursor.getFullYear(),mo=state.cursor.getMonth();
   const todS=todayStr();
-
-  // 달력
-  const first=new Date(yr,mo,1),last=new Date(yr,mo+1,0);
-  const offset=(first.getDay()||7)-1;
+  const lastDay=new Date(yr,mo+1,0),firstDow=new Date(yr,mo,1).getDay();
+  const offset=(firstDow||7)-1;
 
   let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
     <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
-    <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월</span>
     <button onclick="openTravelModal()" class="btn-save" style="margin-left:auto;border-radius:20px;font-size:12px;padding:5px 14px">+ Add</button>
   </div>`;
-
-  html+=`<div class="card month-view" style="margin-bottom:14px"><div class="month-hdr">`;
-  ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach((d,i)=>html+=`<div class="month-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`);
-  html+=`</div><div class="month-grid">`;
-
-  let cells=[];
-  for(let i=0;i<offset;i++){let d=new Date(yr,mo,1-offset+i);cells.push({date:d,other:true});}
-  for(let i=1;i<=last.getDate();i++)cells.push({date:new Date(yr,mo,i),other:false});
-  const rem=7-(cells.length%7);if(rem<7)for(let i=1;i<=rem;i++)cells.push({date:new Date(yr,mo+1,i),other:true});
-
-  cells.forEach(cell=>{
-    const ds=fmtDate(cell.date),isT=ds===todS;
-    const dow=cell.date.getDay(),di=dow===0?6:dow-1;
-    const hol=!cell.other?holName(ds):'';
-    const numColor=hol?'color:var(--red)':di===5?'color:var(--accent)':di===6?'color:var(--red)':'';
-    const travels=!cell.other?data.travels.filter(t=>t.startDate<=ds&&t.endDate>=ds):[];
-    html+=`<div class="month-cell travel-cell${cell.other?' other':''}${isT?' today':''}"
-      onclick="${!cell.other?`openTravelModalDate('${ds}')`:''}"
-      oncontextmenu="event.preventDefault()">`;
-    html+=`<div class="month-cell-num" style="${numColor}"><span>${cell.date.getDate()}</span>${hol?`<span style="font-size:9px;color:var(--red);margin-left:3px">${hol}</span>`:''}</div>`;
-    travels.forEach(t=>{
-      const isStart=t.startDate===ds,isEnd=t.endDate===ds;
-      html+=`<div class="month-ev" style="background:${evBg(t.color)};color:${evTxt(t.color)};cursor:pointer" onclick="event.stopPropagation();openTravelModal('${t.id}')">
-        ${isStart?'✈️ ':''}${isStart?escH(t.name):''}
-      </div>`;
-    });
-    html+=`</div>`;
-  });
-  html+=`</div></div>`;
-
-  // 이달 여행 목록
   const monthTravels=data.travels.filter(t=>{
     const sy=t.startDate.slice(0,7),ey=t.endDate.slice(0,7),cur=`${yr}-${String(mo+1).padStart(2,'0')}`;
     return sy<=cur&&ey>=cur;
   }).sort((a,b)=>a.startDate.localeCompare(b.startDate));
 
-  html+=`<div class="card" style="overflow:hidden">
-    <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between">
-      ${yr}년 ${mo+1}월 여행 <span style="font-size:11px;color:var(--text3);font-weight:400">${monthTravels.length}건</span>
+  html+=`<div class="work-layout"><div class="card" style="overflow:hidden">
+    <div class="work-cal-hdr">${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d,i)=>`<div class="work-dow${i===5?' sat':i===6?' sun':''}">${d}</div>`).join('')}</div>
+    <div class="work-grid">`;
+
+  for(let i=0;i<offset;i++)html+=`<div class="work-cell empty"></div>`;
+  for(let d=1;d<=lastDay.getDate();d++){
+    const ds=ym(yr,mo,d);
+    const dow=new Date(yr,mo,d).getDay(),isTod=ds===todayStr();
+    const holiday=isHol(ds)&&!isTod;
+    const dayTravels=data.travels.filter(t=>t.startDate<=ds&&t.endDate>=ds);
+    const hasTrav=dayTravels.length>0;
+    html+=`<div class="work-cell travel-cell${isTod?' today':''}${holiday?' sun':dow===6&&!isTod?' sat':dow===0&&!isTod?' sun':''}${hasTrav?' worked':''}"
+      style="cursor:pointer" onclick="openTravelModalDate('${ds}')">
+      <div class="work-num" style="${holiday?'color:var(--red)':''}">${d}${holiday?`<span style="font-size:8px;margin-left:2px">${holName(ds)}</span>`:''}</div>`;
+    dayTravels.forEach(t=>{
+      const isStart=t.startDate===ds;
+      html+=`<div class="month-ev" style="background:${evBg(t.color)};color:${evTxt(t.color)};cursor:pointer;font-size:9px" onclick="event.stopPropagation();openTravelModal('${t.id}')">
+        ${isStart?'✈️ '+escH(t.name):'·'}
+      </div>`;
+    });
+    if(!hasTrav)html+=`<div class="golf-empty" style="font-size:12px">+</div>`;
+    html+=`</div>`;
+  }
+  html+=`</div></div>`;
+
+  // 오른쪽 패널 — 여행 목록
+  html+=`<div><div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:10px 14px;font-size:13px;font-weight:600;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px">
+      <span style="width:9px;height:9px;border-radius:50%;background:#0891B2;display:inline-block"></span>이달 여행
+      <span style="font-size:11px;color:var(--text3);font-weight:400;margin-left:auto">${monthTravels.length}건</span>
     </div>`;
 
   if(monthTravels.length===0){
@@ -2274,35 +2267,33 @@ function renderTravel(){
       const start=parseDate(t.startDate),end=parseDate(t.endDate);
       const nights=Math.round((end-start)/(1000*60*60*24));
       const isOpen=window._openTravel===t.id;
-      html+=`<div>
-        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer" onclick="toggleTravelLog('${t.id}')">
-          <div style="width:10px;height:10px;border-radius:50%;background:${t.color};flex-shrink:0"></div>
+      html+=`<div style="border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer" onclick="toggleTravelLog('${t.id}')">
+          <div style="width:8px;height:8px;border-radius:50%;background:${t.color};flex-shrink:0"></div>
           <div style="flex:1;min-width:0">
-            <div style="font-size:13px;font-weight:500">${escH(t.name)}</div>
-            <div style="font-size:11px;color:var(--text3);margin-top:2px">
+            <div style="font-size:12px;font-weight:500">${escH(t.name)}</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:1px">
               ${t.destination?`📍${escH(t.destination)} · `:''}${t.startDate} ~ ${t.endDate} (${nights}박${nights+1}일)
             </div>
-            ${t.memo?`<div style="font-size:11px;color:var(--text2);margin-top:2px">${escH(t.memo)}</div>`:''}
           </div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <button onclick="event.stopPropagation();openTravelModal('${t.id}')" class="btn-cancel" style="font-size:11px;padding:2px 8px">✎</button>
-            <span style="font-size:12px;color:var(--text3)">${isOpen?'▲':'▼'}</span>
+          <div style="display:flex;align-items:center;gap:4px">
+            <button onclick="event.stopPropagation();openTravelModal('${t.id}')" class="btn-cancel" style="font-size:10px;padding:2px 6px">✎</button>
+            <span style="font-size:11px;color:var(--text3)">${isOpen?'▲':'▼'}</span>
           </div>
         </div>`;
       if(isOpen){
-        // 날짜별 기록
         const days=[];
         for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1))days.push(fmtDate(new Date(d)));
-        html+=`<div style="background:var(--surface2);padding:8px 14px;border-bottom:1px solid var(--border)">`;
+        html+=`<div style="background:var(--surface2);padding:6px 14px">`;
         days.forEach(ds=>{
           const logKey=`travel_${t.id}_${ds}`;
           const logVal=data.classMemos[logKey]||'';
           const dd=parseDate(ds);
           const dow=['일','월','화','수','목','금','토'][dd.getDay()];
-          html+=`<div style="display:flex;align-items:flex-start;gap:10px;padding:5px 0;border-bottom:1px solid var(--border)">
-            <div style="font-size:11px;color:var(--text3);width:70px;flex-shrink:0;padding-top:6px">${dd.getMonth()+1}/${dd.getDate()} (${dow})</div>
+          html+=`<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid var(--border)">
+            <div style="font-size:10px;color:var(--text3);width:60px;flex-shrink:0">${dd.getMonth()+1}/${dd.getDate()} (${dow})</div>
             <input type="text" value="${escH(logVal)}" placeholder="${ds===fmtDate(start)?'출발...':ds===fmtDate(end)?'귀국...':''}"
-              style="flex:1;padding:5px 8px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:12px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font)"
+              style="flex:1;padding:3px 6px;border:1px solid var(--border2);border-radius:var(--radius-xs);font-size:11px;background:var(--bg);color:var(--text);outline:none;font-family:var(--font)"
               onblur="saveTravelLog('${t.id}','${ds}',this.value)"
               onkeydown="if(event.key==='Enter')this.blur()">
           </div>`;
@@ -2312,7 +2303,7 @@ function renderTravel(){
       html+=`</div>`;
     });
   }
-  html+=`</div>`;
+  html+=`</div></div></div>`;
   document.getElementById('main-content').innerHTML=html;
 }
 
@@ -2944,12 +2935,12 @@ function openCellColorPicker(ds,evt){
   document.getElementById('cell-color-picker-el')?.remove();
   const cur=data.cellColors[ds]||'';
   const curEmoji=data.cellEmojis[ds]||'';
-  let h=`<div id="cell-color-picker-el" class="cell-color-picker" onclick="event.stopPropagation()" style="width:190px">
+  let h=`<div id="cell-color-picker-el" class="cell-color-picker" onclick="event.stopPropagation()" style="width:210px">
     <div style="font-size:10px;color:var(--text3);margin-bottom:5px;font-weight:600">이모지</div>
-    <div style="display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap">
-      ${['☀️','🌙','🌧','❄️','🌸','🏠','🏖','🚗','✈️','🎉','📝','💊','💪','😴','❤️','⭐'].map(e=>`<span style="cursor:pointer;font-size:16px;padding:2px;border-radius:4px;${e===curEmoji?'background:var(--accent-bg)':''}" onclick="setCellEmoji('${ds}','${e==='${curEmoji}'?'':e}')">${e}</span>`).join('')}
-      <input type="text" value="${curEmoji}" maxlength="2" placeholder="✏️" 
-        style="width:32px;padding:2px;border:1px solid var(--border2);border-radius:4px;font-size:14px;text-align:center;background:var(--bg);outline:none"
+    <div style="display:flex;gap:3px;margin-bottom:8px;flex-wrap:wrap">
+      ${['☀️','🌙','🌧','❄️','🌸','🌿','🔥','⚡','🌈','🏠','🏖','🏔','🚗','✈️','🚂','🎉','🎂','🎁','📝','📚','💊','💉','💪','😴','❤️','💙','⭐','✨','🍀','🌺','🦋','🐾'].map(e=>`<span style="cursor:pointer;font-size:13px;padding:2px;border-radius:3px;${e===curEmoji?'background:var(--accent-bg)':''}" onclick="setCellEmoji('${ds}','${e==='${curEmoji}'?'':e}')">${e}</span>`).join('')}
+      <input type="text" value="${curEmoji}" maxlength="2" placeholder="✏️"
+        style="width:28px;padding:2px;border:1px solid var(--border2);border-radius:4px;font-size:12px;text-align:center;background:var(--bg);outline:none"
         oninput="setCellEmoji('${ds}',this.value)" onclick="event.stopPropagation()">
       <button onclick="setCellEmoji('${ds}','')" style="font-size:10px;color:var(--text3);background:none;border:none;cursor:pointer">✕</button>
     </div>
@@ -3078,9 +3069,11 @@ function exportData(){
 // ── History & Mobile ──────────────────────────────────────
 // 탭 복귀시 동기화 상태 리셋
 let _reloadInProgress=false;
-let _lastReloadAt=0;        // 마지막 reload 완료 시각 (ms)
+let _lastReloadAt=0;
+let _lastHiddenAt=0;       // 백그라운드 진입 시각
 let _reloadDebounceTimer=null;
-const RELOAD_COOLDOWN=4000; // 4초 이내 재실행 skip
+const RELOAD_COOLDOWN=4000;
+const AWAY_THRESHOLD=30000; // 30초 미만 자리비움이면 reload skip
 
 async function reloadOnResume(){
   // 저장 진행 중인 요청이 있으면 skip
@@ -3088,6 +3081,8 @@ async function reloadOnResume(){
   // 쿨다운: 마지막 reload로부터 RELOAD_COOLDOWN ms 이내면 skip
   const now=Date.now();
   if(now-_lastReloadAt<RELOAD_COOLDOWN)return;
+  // 자리비움 시간이 AWAY_THRESHOLD 미만이면 skip
+  if(_lastHiddenAt>0&&(now-_lastHiddenAt)<AWAY_THRESHOLD)return;
   _reloadInProgress=true;
   try{
     setSyncing();
@@ -3120,8 +3115,12 @@ function scheduleReloadOnResume(){
   _reloadDebounceTimer=setTimeout(reloadOnResume,300);
 }
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible') scheduleReloadOnResume();
-  else if(document.visibilityState==='hidden') flushPendingMemos();
+  if(document.visibilityState==='visible'){
+    scheduleReloadOnResume();
+  } else if(document.visibilityState==='hidden'){
+    _lastHiddenAt=Date.now();
+    flushPendingMemos();
+  }
 });
 window.addEventListener('pageshow',(e)=>{
   // bfcache(뒤로가기 캐시)에서 복원될 때도 재동기화
