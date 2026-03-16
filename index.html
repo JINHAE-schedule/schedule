@@ -34,7 +34,7 @@
   --shadow:0 1px 3px rgba(0,0,0,.3),0 4px 12px rgba(0,0,0,.2);
   --shadow-lg:0 8px 32px rgba(0,0,0,.4);
 }
-html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;-webkit-font-smoothing:antialiased;}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;-webkit-font-smoothing:antialiased;overflow-x:hidden;overscroll-behavior-y:none;}
 
 /* Login */
 #login-screen{display:none;position:fixed;inset:0;background:var(--bg);align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:20px;}
@@ -659,13 +659,6 @@ let _syncTimer=null;
 function setSyncing(){
   document.getElementById('sync-dot').className='sync-dot syncing';
   document.getElementById('sync-txt').textContent='Syncing...';
-  // 10초 후 자동 리셋 (멈춤 방지)
-  clearTimeout(_syncTimer);
-  _syncTimer=setTimeout(()=>{
-    if(document.getElementById('sync-dot').classList.contains('syncing')){
-      setSynced();
-    }
-  },10000);
 }
 function setSynced(){document.getElementById('sync-dot').className='sync-dot';document.getElementById('sync-txt').textContent='Synced';}
 function setSyncErr(m){document.getElementById('sync-dot').className='sync-dot error';document.getElementById('sync-txt').textContent=m||'Error';}
@@ -1004,9 +997,7 @@ function renderMonth(){
   const yr=state.cursor.getFullYear(),mo=state.cursor.getMonth();
   // 뷰 내 네비게이션 헤더
   let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-    <button onclick="navigate(-1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">‹</button>
     <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
-    <button onclick="navigate(1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">›</button>
     <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월~</span>
 
   </div>`;
@@ -1106,9 +1097,7 @@ function renderFiltered(){
   const monthProjEvs=filteredProjEvs.filter(e=>e.date.startsWith(moStr));
 
   let html=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-    <button onclick="navigate(-1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">‹</button>
     <button onclick="goToday()" class="btn-cancel" style="padding:4px 12px;font-size:12px">Today</button>
-    <button onclick="navigate(1)" class="btn-cancel" style="padding:4px 12px;font-size:16px">›</button>
     <span style="font-size:14px;font-weight:600;font-family:var(--font-ui);margin-left:4px">${yr}년 ${mo+1}월</span>
     <span style="font-size:12px;font-weight:500;padding:3px 10px;border-radius:12px;background:${color==='var(--text2)'?'var(--surface2)':evBg(color)};color:${color==='var(--text2)'?'var(--text2)':evTxt(color)}">${emoji?emoji+' ':''}${escH(label)}</span>
     <button onclick="setView('month')" class="btn-cancel" style="font-size:11px;padding:2px 8px;border-radius:12px;margin-left:auto">✕ 전체보기</button>
@@ -2790,6 +2779,9 @@ async function importData(e){
         sb.from('golf').delete().eq('user_id',uid),
         sb.from('office').delete().eq('user_id',uid),
         sb.from('cell_colors').delete().eq('user_id',uid),
+        sb.from('travels').delete().eq('user_id',uid),
+        sb.from('class_memos').delete().eq('user_id',uid),
+        sb.from('home_notes').delete().eq('user_id',uid),
       ]);
       if((d.projects||[]).length)await sb.from('projects').insert(d.projects.map(p=>({id:p.id,user_id:uid,name:p.name,color:p.color})));
       if((d.projEvents||[]).length)await sb.from('events').insert(d.projEvents.map(ev=>({id:ev.id,user_id:uid,title:ev.title,date:ev.date,start:ev.start||null,end:null,project_id:ev.projectId||null,color:ev.color||null,note:ev.note||null})));
@@ -2807,7 +2799,6 @@ async function importData(e){
       if(d.homeNote)await saveHomeNote(d.homeNote);
       // travels 복원
       if((d.travels||[]).length){
-        await sb.from('travels').delete().eq('user_id',uid);
         await sb.from('travels').insert(d.travels.map(t=>({id:t.id,user_id:uid,name:t.name,destination:t.destination||'',start_date:t.startDate,end_date:t.endDate,color:t.color||'#4472C4',memo:t.memo||''})));
       }
       // classMemos + haegobjMemos 복원
@@ -2823,8 +2814,7 @@ async function importData(e){
         allMemos.push({user_id:uid,project_id:'haegobj_'+ds,week:0,content:v});
       });
       if(allMemos.length){
-        await sb.from('class_memos').delete().eq('user_id',uid);
-        // 50개씩 나눠서 insert
+        // 50개씩 나눠서 insert (이미 위에서 삭제함)
         for(let i=0;i<allMemos.length;i+=50)
           await sb.from('class_memos').insert(allMemos.slice(i,i+50));
       }
@@ -2845,14 +2835,9 @@ function exportData(){
 // ── History & Mobile ──────────────────────────────────────
 // 탭 복귀시 동기화 상태 리셋
 let _reloadInProgress=false;
-let _lastReload=0;
 async function reloadOnResume(){
-  if(!currentUser)return;
-  // 5초 내 중복 실행 방지
-  const now=Date.now();
-  if(_reloadInProgress||(now-_lastReload<5000))return;
+  if(!currentUser||_reloadInProgress)return;
   _reloadInProgress=true;
-  _lastReload=now;
   console.log('[resume] reloadOnResume 시작');
   try{
     setSyncing();
@@ -2871,7 +2856,7 @@ async function reloadOnResume(){
       return;
     }
     currentUser=session.user;
-    await loadAll();
+    await loadAll(); // loadAll 안에서 setSynced()+renderAll() 호출됨
   }catch(e){
     console.error('[resume] 실패:',e);
     setSyncErr('Sync failed');
@@ -2881,13 +2866,14 @@ async function reloadOnResume(){
 }
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible'){
-    console.log('[resume] visibilitychange visible');
     reloadOnResume();
   }
 });
-window.addEventListener('focus',()=>{
-  console.log('[resume] focus');
-  reloadOnResume();
+window.addEventListener('pageshow',(e)=>{
+  // bfcache(뒤로가기 캐시)에서 복원될 때도 재동기화
+  if(e.persisted||document.visibilityState==='visible'){
+    reloadOnResume();
+  }
 });
 
 function setupHistory(){
