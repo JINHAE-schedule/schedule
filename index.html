@@ -109,6 +109,7 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
 .month-dow.sun{color:var(--red);}
 .month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));}
 .month-cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:5px 5px;cursor:pointer;transition:background .1s;background:var(--surface);min-height:96px;min-width:0;overflow:hidden;}
+.travel-cell{min-height:90px !important;}
 .month-cell:hover{background:var(--accent-bg);}
 .month-cell.other{opacity:.35;cursor:default;background:var(--surface2);}
 .month-cell.other:hover{background:var(--surface2);}
@@ -313,6 +314,8 @@ html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--t
   /* ── Work 뷰 ── */
   .work-layout{grid-template-columns:1fr !important;}
   .work-cell{min-height:52px !important;}
+  /* Travel도 같은 높이 */
+  .travel-cell{min-height:52px !important;}
   .year-view{grid-template-columns:repeat(2,1fr) !important;}
 
   /* ── 모달 ── */
@@ -1847,7 +1850,7 @@ function renderTodos(){
   // cursor 기준 3일 (전날, 오늘, 내일)
   const base=new Date(state.cursor);
   const todS=todayStr();
-  const days=[-1,0,1].map(i=>{
+  const days=[0,1,2].map(i=>{
     const d=new Date(base);d.setDate(d.getDate()+i);return fmtDate(d);
   });
 
@@ -2090,7 +2093,7 @@ function renderTravel(){
     const hol=!cell.other?holName(ds):'';
     const numColor=hol?'color:var(--red)':di===5?'color:var(--accent)':di===6?'color:var(--red)':'';
     const travels=!cell.other?data.travels.filter(t=>t.startDate<=ds&&t.endDate>=ds):[];
-    html+=`<div class="month-cell${cell.other?' other':''}${isT?' today':''}"
+    html+=`<div class="month-cell travel-cell${cell.other?' other':''}${isT?' today':''}"
       onclick="${!cell.other?`openTravelModalDate('${ds}')`:''}"
       oncontextmenu="event.preventDefault()">`;
     html+=`<div class="month-cell-num" style="${numColor}"><span>${cell.date.getDate()}</span>${hol?`<span style="font-size:9px;color:var(--red);margin-left:3px">${hol}</span>`:''}</div>`;
